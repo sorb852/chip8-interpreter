@@ -3,27 +3,19 @@ const Io = std.Io;
 
 const ziggy = @import("ziggy");
 
-/// Applies the main rule of collatz conjecture to number `a`.
-fn apply_rule(a: u64) u64 {
-    return if (a % 2 == 0) (a / 2) else (3 * a + 1);
-}
-
-/// Creates the sequence of numbers generated when the starting number is `start`
-fn create_chain(list: *std.ArrayList(u64), allocator: std.mem.Allocator, start: u64) !void {
-    try list.append(allocator, start);
-    while (list.getLast() > 1) {
-        // no i am not changing this
-        // idiot admires complexity
-        // and wouldnt you know, long ass one liner that is slow
-        try list.append(allocator, apply_rule(list.getLast()));
-    }
-}
-
-/// Get's the first argument and takes it as the value for `n`
-fn get_n(args_raw: *const std.process.Args, allocator: std.mem.Allocator) !u64 {
-    const args = try args_raw.toSlice(allocator);
-    return try std.fmt.parseInt(u64, args[1], 10); // yeah im gonan be a lazy bum and do this
-}
+/// Main Chip-8 manager
+const Chip8VM = struct {
+    /// starts main game memory at 512
+    memory: [4096]u8 = [0] ** 4096,
+    V: [16]u8 = [0] ** 16,
+    I: u16,
+    DT: u8 = 0,
+    ST: u8 = 0,
+    PC: u16,
+    SP: u8,
+    stack: [16]u16,
+    keyboard: u16,
+};
 
 pub fn main(init: std.process.Init) !void {
     const arena: std.mem.Allocator = init.arena.allocator();
