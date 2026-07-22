@@ -58,7 +58,7 @@ const Chip8VM = struct {
     }
     /// Increment register *Vx* by a value
     fn ADD(self: *Chip8VM, x: u8, byte: u8) void {
-        self.V[x] += byte;
+        self.V[x] +%= byte;
     }
     /// Sets *Vx* to *Vy*
     fn LDV(self: *Chip8VM, x: u8, y: u8) void {
@@ -76,13 +76,19 @@ const Chip8VM = struct {
     fn XOR(self: *Chip8VM, x: u8, y: u8) void {
         self.V[x] ^= self.V[y];
     }
-    /// Sets *Vx* to *Vx* + *Vy* and *Vk* as the carry out
+    /// Sets *Vx* to *Vx* + *Vy* and *VF* as the carry out
     fn ADDV(self: *Chip8VM, x: u8, y: u8) void {
-        // TODO: wtf how
-        self.V[x] += self.V[y];
+        const added = self.V[x] +% self.V[y];
+        self.V[x] = added;
+        self.V[0xF] = if (added < self.V[x]) 1 else 0;
     }
-    fn TEMPLATE(self: *Chip8VM) void {
+    /// Sets *Vx* to *Vx* - *Vy* and set *VF* to `!*borrow*`
+    fn SUB(self: *Chip8VM, x: u8, y: u8) void {
+        const added = u16(self.V[x]) + u16(self.V[y]);
+        self.V[x] = u8(added % 256);
+        self.V[0xF] = if (added < self.V[x]) 1 else 0; // i got a proof for this and everything (i know, basic algebra BBUT it IS algebra. we can js ignore the easy part)
     }
+    fn TEMPLATE(self: *Chip8VM) void {}
 };
 
 pub fn main(init: std.process.Init) !void {
