@@ -1,13 +1,12 @@
 const std = @import("std");
-const Io = std.Io;
 
 const ziggy = @import("ziggy");
 
 /// Main Chip-8 manager
 const Chip8VM = struct {
     /// starts main game memory at 512
-    memory: [4096]u8 = [0] ** 4096,
-    V: [16]u8 = [0] ** 16,
+    memory: [4096]u8 = [0]**4096,
+    V: [16]u8 = [0]**16,
     I: u16,
     DT: u8 = 0,
     ST: u8 = 0,
@@ -15,6 +14,75 @@ const Chip8VM = struct {
     SP: u8,
     stack: [16]u16,
     keyboard: u16,
+    display: u64[32],
+
+    /// Clear screen
+    fn CLS(self: *Chip8VM) void {
+        for (self.display) |row| {
+            row = 0;
+        }
+    }
+    /// Return from subroutine
+    fn RET(self: *Chip8VM) void {
+        self.PC = self.stack[self.SP];
+        self.SP -= 1;
+    }
+    /// Jump to address
+    fn JP(self: *Chip8VM, addr: u16) void {
+        self.PC = addr;
+    }
+    /// Call a subroutine
+    fn CALL(self: *Chip8VM, addr: u16) void {
+        self.SP += 1;
+        self.stack[self.SP] = self.PC;
+        self.PC = addr;
+    }
+    /// Skip next instruction if *Vx* == byte
+    fn SE(self: *Chip8VM, x: u8, byte: u8) void {
+        if (self.V[x] == byte)
+            self.PC += 2;
+    }
+    /// Skip next instruction if *Vx* != byte
+    fn SNE(self: *Chip8VM, x: u8, byte: u8) void {
+        if (self.V[x] != byte)
+            self.PC += 2;
+    }
+    /// Skip next instruction if *Vx* == *Vy*
+    fn SEV(self: *Chip8VM, x: u8, y: u8) void {
+        if (self.V[x] == self.V[y])
+            self.PC += 2;
+    }
+    /// Sets a value to register *Vx*
+    fn LD(self: *Chip8VM, x: u8, byte: u8) void {
+        self.V[x] = byte;
+    }
+    /// Increment register *Vx* by a value
+    fn ADD(self: *Chip8VM, x: u8, byte: u8) void {
+        self.V[x] += byte;
+    }
+    /// Sets *Vx* to *Vy*
+    fn LDV(self: *Chip8VM, x: u8, y: u8) void {
+        self.V[x] = self.V[y];
+    }
+    /// Sets *Vx* to *Vx* | *Vy*
+    fn OR(self: *Chip8VM, x: u8, y: u8) void {
+        self.V[x] |= self.V[y];
+    }
+    /// Sets *Vx* to *Vx* & *Vy*
+    fn AND(self: *Chip8VM, x: u8, y: u8) void {
+        self.V[x] &= self.V[y];
+    }
+    /// Sets *Vx* to *Vx* ^ *Vy*
+    fn XOR(self: *Chip8VM, x: u8, y: u8) void {
+        self.V[x] ^= self.V[y];
+    }
+    /// Sets *Vx* to *Vx* + *Vy* and *Vk* as the carry out
+    fn ADDV(self: *Chip8VM, x: u8, y: u8) void {
+        // TODO: wtf how
+        self.V[x] += self.V[y];
+    }
+    fn TEMPLATE(self: *Chip8VM) void {
+    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -23,7 +91,7 @@ pub fn main(init: std.process.Init) !void {
 
     // stdout boilerplate
     var stdout_buffer: [512]u8 = undefined;
-    var stdout_file_writer: Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
+    var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
     const stdout = &stdout_file_writer.interface;
 
     const n: u64 = try get_n(&init.minimal.args, arena);
