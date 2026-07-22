@@ -10,6 +10,8 @@ Currently **WIP** and has **AWFUL** code but I have excuses for that.
 
 its a chip8 interpreter bro what is there to want.
 
+ok maybe you want an interpreter ou shii i forgot
+
 just so you know, there is ZERO error handling or formatting right now. if something goes wrong, remember that youre the one using this interpreter (idk why you would use a random ass interpreter over anything community standard but ok)
 
 # blabbering
