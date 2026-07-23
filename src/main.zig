@@ -121,7 +121,17 @@ const Chip8VM = struct {
     }
     /// Display *n* byte sprite starting from location from *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
     fn DRW(self: *Chip8VM, x: u8, y: u8, n: u8) void {
-        // TODO: ok yeah this is gonna be complicated
+        var index = 0;
+        self.V[0xF] = 0;
+        while (index < n) : (index += 1) {
+            var sprite_row = u64(self.memory[self.I + index]) << (64 - 8 + self.V[x]);
+            var current_row = self.display[self.V[y] + index];
+            var new_row = current_row ^ sprite_row;
+            if (current_row > current_row & new_row) {
+                self.V[0xF] = 1;
+            }
+            self.display[self.V[y] + index] = new_row;
+        }
     }
     fn TEMPLATE(self: *Chip8VM) void {}
 };
