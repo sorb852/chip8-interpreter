@@ -133,6 +133,24 @@ const Chip8VM = struct {
             self.display[self.V[y] + index] = new_row;
         }
     }
+    /// Skip next instruction if key with value *Vx* is being pressed
+    fn SKP(self: *Chip8VM, x: u8) void {
+        if (self.keyboard & (1 << x) > 0)
+            self.PC += 2;
+    }
+    /// Skip next instruction if key with value *Vx* is **NOT** being pressed
+    fn SKNP(self: *Chip8VM, x: u8) void {
+        if (self.keyboard & (1 << x) == 0)
+            self.PC += 2;
+    }
+    /// Sets value of *DT* to register *Vx*
+    fn LDVDT(self: *Chip8VM, x: u8) void {
+        self.V[x] = self.DT;
+    }
+    /// Stop execution until a key press and store key in *Vx*
+    fn LDVK(self: *Chip8VM, x: u8) void {
+        // TODO: Implement when game loop is done.
+    }
     fn TEMPLATE(self: *Chip8VM) void {}
 };
 
