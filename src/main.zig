@@ -79,14 +79,49 @@ const Chip8VM = struct {
     /// Sets *Vx* to *Vx* + *Vy* and *VF* as the carry out
     fn ADDV(self: *Chip8VM, x: u8, y: u8) void {
         const added = self.V[x] +% self.V[y];
-        self.V[x] = added;
         self.V[0xF] = if (added < self.V[x]) 1 else 0;
+        self.V[x] = added;
     }
     /// Sets *Vx* to *Vx* - *Vy* and set *VF* to `!*borrow*`
     fn SUB(self: *Chip8VM, x: u8, y: u8) void {
-        const added = u16(self.V[x]) + u16(self.V[y]);
-        self.V[x] = u8(added % 256);
-        self.V[0xF] = if (added < self.V[x]) 1 else 0; // i got a proof for this and everything (i know, basic algebra BBUT it IS algebra. we can js ignore the easy part)
+        self.V[0xF] = if (self.V[x] > self.V[y]) 1 else 0;
+        self.V[x] -%= self.V[y];
+    }
+    /// Bitwise shift *Vx* left by one and set *VF* to 1 if least significant bit is 1
+    fn SHR(self: *Chip8VM, x: u8) void {
+        self.V[0xF] = self.V[x] & 1;
+        self.V[x] >>= 1;
+    }
+    /// Sets *Vx* to *Vy* - *Vx* and set *VF* to `!*borrow*`
+    fn SUBN(self: *Chip8VM, x: u8, y: u8) void {
+        self.V[0xF] = if (self.V[y] > self.V[x]) 1 else 0;
+        self.V[x] = self.V[y] -% self.V[x];
+    }
+    /// Bitwise shift *Vx* left by one and set *VF* to 1 if least significant bit is 1
+    fn SHL(self: *Chip8VM, x: u8) void {
+        self.V[0xF] = self.V[x] & 128;
+        self.V[x] <<= 1;
+    }
+    /// Skip next instruction if *Vx* != *Vy*
+    fn SNEV(self: *Chip8VM, x: u8, y: u8) void {
+        if (self.V[x] != self.V[y])
+            self.PC += 2;
+    }
+    /// Sets *I* to *addr*
+    fn LDI(self: *Chip8VM, addr: u16) void {
+        self.I = addr;
+    }
+    /// Jump to address + V0
+    fn JP(self: *Chip8VM, addr: u16) void {
+        self.PC = addr + self.V[0];
+    }
+    /// Set *Vx* = *random byte* & *byte*
+    fn RND(self: *Chip8VM, x: u8, byte: u8, rand: std.Random) void {
+        self.V[x] = rand.intRangeAtMost(u8, 0, 255) & byte;
+    }
+    /// Display *n* byte sprite starting from location from *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
+    fn DRW(self: *Chip8VM, x: u8, y: u8, n: u8) void {
+        // TODO: ok yeah this is gonna be complicated
     }
     fn TEMPLATE(self: *Chip8VM) void {}
 };
@@ -99,6 +134,13 @@ pub fn main(init: std.process.Init) !void {
     var stdout_buffer: [512]u8 = undefined;
     var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
     const stdout = &stdout_file_writer.interface;
+
+    var prng: std.Random.DefaultPrng = .init(blk: {
+        var seed: u64 = undefined;
+        try std.posix.getrandom(std.mem.asBytes(&seed));
+        break :blk seed;
+    });
+    const rand = prng.random();
 
     const n: u64 = try get_n(&init.minimal.args, arena);
     var chain: std.ArrayList(u64) = .empty;
