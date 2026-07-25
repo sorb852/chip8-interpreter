@@ -112,7 +112,7 @@ const Chip8VM = struct {
         self.I = addr;
     }
     /// Jump to address + V0
-    fn JP(self: *Chip8VM, addr: u16) void {
+    fn JPV(self: *Chip8VM, addr: u16) void {
         self.PC = addr + self.V[0];
     }
     /// Set *Vx* = *random byte* & *byte*
@@ -124,9 +124,9 @@ const Chip8VM = struct {
         var index = 0;
         self.V[0xF] = 0;
         while (index < n) : (index += 1) {
-            var sprite_row = u64(self.memory[self.I + index]) << (64 - 8 + self.V[x]);
-            var current_row = self.display[self.V[y] + index];
-            var new_row = current_row ^ sprite_row;
+            const sprite_row = u64(self.memory[self.I + index]) << (64 - 8 + self.V[x]);
+            const current_row = self.display[self.V[y] + index];
+            const new_row = current_row ^ sprite_row;
             if (current_row > current_row & new_row) {
                 self.V[0xF] = 1;
             }
@@ -151,6 +151,42 @@ const Chip8VM = struct {
     fn LDVK(self: *Chip8VM, x: u8) void {
         // TODO: Implement when game loop is done.
     }
+    /// Sets value of register *Vx* to *DT*
+    fn LDDTV(self: *Chip8VM, x: u8) void {
+        self.DT = self.V[x];
+    }
+    /// Sets value of register *Vx* to *ST*
+    fn LDSTV(self: *Chip8VM, x: u8) void {
+        self.ST = self.V[x];
+    }
+    /// Increment register *I* by the value of *Vx*
+    fn ADDI(self: *Chip8VM, x: u8) void {
+        self.I +%= self.V[x];
+    }
+    fn LDIVX(self: *Chip8VM, x: u8) void {
+        // TODO: Implement after setting hex digits
+    }
+    /// Places the digits of *Vx* to I, I+1 and I+2
+    fn LDBVX(self: *Chip8VM, x: u8) void {
+        self.memory[self.I + 0] = self.V[x] / 100 % 10;
+        self.memory[self.I + 1] = self.V[x] / 10 % 10;
+        self.memory[self.I + 2] = self.V[x] / 1 % 10;
+    }
+    /// Stores values of *V0* to *Vx* starting from address at value of *I*
+    fn LDIV0VX(self: *Chip8VM, x: u8) void {
+        var index = 0;
+        while (index <= x) : (index += 1) {
+            self.memory[self.I + index] = self.V[index];
+        }
+    }
+    /// Reads values starting at address of *I*s value to *V0* to *Vx*
+    fn LDV0VXI(self: *Chip8VM, x: u8) void {
+        var index = 0;
+        while (index <= x) : (index += 1) {
+            self.V[index] = self.memory[self.I + index];
+        }
+    }
+
     fn TEMPLATE(self: *Chip8VM) void {}
 };
 
