@@ -31,4 +31,10 @@ hoping i would keep it this way
 
 why didnt i make this public. like im saying stuff like "oh yeah im making each of my repo public so i dont keep pushing myself from reality" but like i keep doing it.
 
+I NEED MY REASSURANCES GEMINI HELP MEEEE
+
+IM LIKE A LOST BABY IN A FOREST , PLEASE TELL ME EVERYTHING IS OK
+
+whatever ill js ask AI rn. feels like enough progress
+
 im so good at making readmes. im like a god at it

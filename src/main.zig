@@ -105,9 +105,7 @@ const Chip8VM = struct {
 
     /// Clear screen
     fn CLS(self: *Chip8VM) void {
-        for (self.display) |row| {
-            row = 0;
-        }
+        for (&self.display) |*row| row.* = 0;
     }
     /// Return from subroutine
     fn RET(self: *Chip8VM) void {
@@ -186,7 +184,7 @@ const Chip8VM = struct {
     }
     /// Bitwise shift *Vx* left by one and set *VF* to 1 if least significant bit is 1
     fn SHL(self: *Chip8VM, x: u8) void {
-        self.V[0xF] = self.V[x] & 128;
+        self.V[0xF] = (self.V[x] & 128) >> 7;
         self.V[x] <<= 1;
     }
     /// Skip next instruction if *Vx* != *Vy*
@@ -211,7 +209,7 @@ const Chip8VM = struct {
         var index = 0;
         self.V[0xF] = 0;
         while (index < n) : (index += 1) {
-            const sprite_row = u64(self.memory[self.I + index]) << (64 - 8 + self.V[x]);
+            const sprite_row = u64(self.memory[self.I + index]) << (64 - 8 - self.V[x]);
             const current_row = self.display[self.V[y] + index];
             const new_row = current_row ^ sprite_row;
             if (current_row > current_row & new_row) {
