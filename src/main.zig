@@ -273,8 +273,6 @@ const Chip8VM = struct {
             self.V[index] = self.memory[self.I + index];
         }
     }
-
-    fn TEMPLATE(self: *Chip8VM) void {}
 };
 
 pub fn main(init: std.process.Init) !void {
