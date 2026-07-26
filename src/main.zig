@@ -35,7 +35,7 @@ const Chip8VM = struct {
     display: u64[32],
 
     // Interpreter related
-    
+
     /// Tells the frontend of the interpreter to redraw.
     /// Dont wanna be redrawing everything would you?
     needs_redraw: bool,
@@ -300,6 +300,15 @@ const Chip8VM = struct {
         }
     }
 };
+
+fn draw_chip8_display(vm: *Chip8VM, output: *std.Io.Writer) void {
+    for (vm.display) |row| {
+        var index: u64 = 1 << 63;
+        while (index > 0) : (index <<= 1)
+            output.print("{s}", .{if ((row & index) != 0) "█" else " "});
+        output.print("\n");
+    }
+}
 
 pub fn main(init: std.process.Init) !void {
     const arena: std.mem.Allocator = init.arena.allocator();
