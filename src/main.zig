@@ -2,20 +2,48 @@ const std = @import("std");
 
 const ziggy = @import("ziggy");
 
-/// Main Chip-8 manager
+/// Chip8 virtual machine. ie, the backend.
+/// Handles most of the action.
+/// Running games, "*managing*" memory, storing registers and all that.
 const Chip8VM = struct {
-    /// starts main game memory at 512
+    /// Starts main game memory at 512
     memory: [4096]u8 = [0]**4096,
+    /// *V* registers, from *V0* to *VF*
     V: [16]u8 = [0]**16,
+    /// *I* register
     I: u16,
+    /// Delay timer
     DT: u8 = 0,
+    /// Sound timer
     ST: u8 = 0,
+    /// Program counter
     PC: u16,
+    /// Stack counter
     SP: u8,
     stack: [16]u16,
+    /// Keypad represented as such
+    /// Shift to get placement of the pad
+    /// ```
+    /// 123C
+    /// 456D
+    /// 789E
+    /// A0BF
+    /// ```
+    /// To get the top middle (2), you must *keyboard* & (1 << 2) to get if the key is pressed or not
     keyboard: u16,
+    /// Stores the display. Each row of pixels is a bit represented using unsigned 64 bit integer
     display: u64[32],
 
+    // Interpreter related
+    
+    /// Tells the frontend of the interpreter to redraw.
+    /// Dont wanna be redrawing everything would you?
+    needs_redraw: bool,
+
+    // Methods
+
+    /// Initialize the hex sprites.
+    /// Starts from 0 to 79, with each sprite having 5 bytes.
     fn init_sprites(self: *Chip8VM) void {
         // im so fucking lazy
         // im js gonna make gemini do this like its so damn boring
