@@ -48,8 +48,11 @@ pub const Chip8VM = struct {
     /// Tells the frontend of the interpreter to redraw.
     /// Dont wanna be redrawing everything would you?
     needs_redraw: bool,
+    /// For instruction LDVK (Fx0A)
     waiting_for_keypress: bool,
-    to_set_keypress_to: u8,
+    /// Paired with `waiting_for_keypress`.
+    /// Stores which register to write to.
+    to_set_keypress_to: u4,
 
     // Methods
 
@@ -154,6 +157,12 @@ pub const Chip8VM = struct {
     fn tick(self: *Chip8VM) void {
         self.DT -= if (self.DT > 0) 1 else 0;
         self.ST -= if (self.ST > 0) 1 else 0;
+
+        // TODO: wtf is this ethical?
+        // like should the timer and running instructions be separate?
+        // yeahh i think so
+        // lets just make it up to the frontend
+        // how about that?
         run_instruction(self.memory[self.PC]);
     }
     /// Poll input and change state.
@@ -161,7 +170,6 @@ pub const Chip8VM = struct {
     ///
     /// ok obviously not like 2 billion times a second
     fn poll_input(self: *Chip8VM, key: u4) void {
-        if (key > 15) return;
         self.keyboard |= 1 << key;
         if (self.waiting_for_keypress) {
             self.waiting_for_keypress = false;
@@ -173,15 +181,22 @@ pub const Chip8VM = struct {
     fn run_instruction(self: *Chip8VM) void {
         if (self.waiting_for_keypress) return;
 
-        const current_instruction: u16 = self.memory[self.PC] << 8 + self.memory[self.PC + 1];
-        const header: u8 = current_instruction >> 12;
-        const payload: u16 = current_instruction - header << 12;
+        // values of the instruction
+        const header: u4 = self.memory[self.PC] >> 4;
+        const addr: u12 = (@as(u12, self.memory[self.PC] % 0x10) << 8) + self.memory[self.PC + 1];
+        const nibble: u12 = self.memory[self.PC + 1] % 0x10;
+        const x: u4 = self.memory[self.PC] % 0x10;
+        const y: u4 = self.memory[self.PC + 1] >> 4;
+        const kk: u8 = self.memory[self.PC + 1];
+
+        var matched_instruction = true;
+
         switch (header) {
             0x0 => {
-                switch (payload) {
+                switch (addr) {
                     0x0E0 => self.CLS(),
                     0x0EE => self.RET(),
-                    else => {},
+                    else => matched_instruction = false,
                 }
             },
             0x1 => self.JP(payload),
@@ -219,9 +234,11 @@ pub const Chip8VM = struct {
             0xD => {},
             0xE => {},
             0xF => {},
-            else => {},
+            else => matched_instruction = false,
         }
-        self.PC += 1;
+
+        if (matched_instruction)
+            self.PC += 1;
     }
 
     // Instruction API
