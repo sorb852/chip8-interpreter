@@ -20,7 +20,7 @@ pub const Chip8VM = struct {
     /// *V* registers, from *V0* to *VF*
     V: [16]u8 = [0]**16,
     /// *I* register
-    I: u16,
+    I: u16 = 0,
     /// Delay timer
     DT: u8 = 0,
     /// Sound timer, use on the frontend to play a tune when non zero.
@@ -28,8 +28,8 @@ pub const Chip8VM = struct {
     /// Program counter
     PC: u16 = 512,
     /// Stack counter
-    SP: u8,
-    stack: [16]u16,
+    SP: u8 = 0,
+    stack: [16]u16 = [0]**16,
     /// Keypad represented as such
     /// Shift to get placement of the pad
     /// ```
@@ -39,9 +39,9 @@ pub const Chip8VM = struct {
     /// A0BF
     /// ```
     /// To get the top middle (2), you must *keyboard* & (1 << 2) to get if the key is pressed or not
-    keyboard: u16,
+    keyboard: u16 = 0,
     /// Stores the display. Each row of pixels is a bit represented using unsigned 64 bit integer
-    display: u64[32],
+    display: u64[32] = [0]**32,
 
     // Interpreter related
 
@@ -50,12 +50,14 @@ pub const Chip8VM = struct {
 
     /// Tells the frontend of the interpreter to redraw.
     /// Dont wanna be redrawing everything would you?
-    needs_redraw: bool,
+    needs_redraw: bool = true,
     /// For instruction LDVK (Fx0A)
-    waiting_for_keypress: bool,
+    waiting_for_keypress: bool = false,
     /// Paired with `waiting_for_keypress`.
     /// Stores which register to write to.
-    to_set_keypress_to: u4,
+    to_set_keypress_to: u4 = 0,
+
+    finished: bool = true,
 
     // Methods
 
@@ -64,6 +66,7 @@ pub const Chip8VM = struct {
     fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) void {
         // ok so had to gemini this one
         try reader.readSliceShort(&self.memory[512..]);
+        self.finished = false;
     }
 
     /// Initialize the hex sprites.
@@ -158,6 +161,8 @@ pub const Chip8VM = struct {
     /// Tick the interpreter state. Should be run every at 1/60th of a second.
     /// This will tick the timers
     fn tick(self: *Chip8VM) void {
+        if (self.finished) return;
+
         self.DT -= if (self.DT > 0) 1 else 0;
         self.ST -= if (self.ST > 0) 1 else 0;
 
@@ -167,6 +172,10 @@ pub const Chip8VM = struct {
         // lets just make it up to the frontend
         // how about that?
         run_instruction(self.memory[self.PC]);
+
+        // TODO: implement a better way to check for exit
+        if (self.PC >= 0x200 and self.memory[self.PC] == 0)
+            self.finished = true;
     }
     /// Poll input and change state.
     /// Call as many times as you want.

@@ -25,17 +25,14 @@ pub fn main(init: std.process.Init) !void {
         try std.posix.getrandom(std.mem.asBytes(&seed));
         break :blk seed;
     });
-    const rand = prng.random();
 
-    const n: u64 = try get_n(&init.minimal.args, arena);
-    var chain: std.ArrayList(u64) = .empty;
-    try create_chain(&chain, arena, n);
+    var chip8 = ziggy.Chip8VM;
+    chip8.rand = prng.random();
+    // TODO: read
 
-    // look im sorry if your stdout is somehow bbroken
-    // but i just could NOT care less
-    for (chain.items) |part| {
-        stdout.print("{d} ", .{part}) catch {};
+    while (!chip8.finished) {
+        // TODO: chip8.poll_input();
+        chip8.tick();
+        draw_chip8_display(&chip8, &stdout);
     }
-    stdout.print("\n", .{}) catch {};
-    try stdout.flush();
 }
