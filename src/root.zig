@@ -45,6 +45,9 @@ pub const Chip8VM = struct {
 
     // Interpreter related
 
+    /// The rng of the Chip8, set as you please.
+    rand: std.Random,
+
     /// Tells the frontend of the interpreter to redraw.
     /// Dont wanna be redrawing everything would you?
     needs_redraw: bool,
@@ -58,7 +61,7 @@ pub const Chip8VM = struct {
 
     /// Loads the ROM code into memory.
     /// Given a reader to the file.
-    fn init_code(self: *Chip8VM, reader: *std.Io.Reader) void {
+    fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) void {
         // ok so had to gemini this one
         try reader.readSliceShort(&self.memory[512..]);
     }
@@ -182,58 +185,65 @@ pub const Chip8VM = struct {
         if (self.waiting_for_keypress) return;
 
         // values of the instruction
+        const instruction: u16 = u16(self.memory[self.PC]) << 8 + self.memory[self.PC + 1];
         const header: u4 = self.memory[self.PC] >> 4;
         const addr: u12 = (u12(self.memory[self.PC] % 0x10) << 8) + self.memory[self.PC + 1];
         const nibble: u12 = self.memory[self.PC + 1] % 0x10;
         const x: u4 = self.memory[self.PC] % 0x10;
         const y: u4 = self.memory[self.PC + 1] >> 4;
-        const kk: u8 = self.memory[self.PC + 1];
+        const byte: u8 = self.memory[self.PC + 1];
 
         var matched_instruction = true;
 
         switch (header) {
             0x0 => {
-                switch (addr) {
-                    0x0E0 => self.CLS(),
-                    0x0EE => self.RET(),
+                switch (instruction) {
+                    0x00E0 => self.CLS(),
+                    0x00EE => self.RET(),
                     else => matched_instruction = false,
                 }
             },
-            0x1 => self.JP(payload),
-            0x2 => self.CALL(payload),
-            0x3 => {
-                const x: u8 = payload >> 8;
-                const kk: u8 = payload - x << 8;
-                self.SE(x, kk);
+            0x1 => self.JP(addr),
+            0x2 => self.CALL(addr),
+            0x3 => self.SE(x, byte),
+            0x4 => self.SNE(x, byte),
+            0x5 => self.SEV(x, y),
+            0x6 => self.LD(x, byte),
+            0x7 => self.ADD(x, byte),
+            0x8 => switch (nibble) {
+                0x0 => self.LDV(x, y),
+                0x1 => self.OR(x, y),
+                0x2 => self.AND(x, y),
+                0x3 => self.XOR(x, y),
+                0x4 => self.ADDV(x, y),
+                0x5 => self.SUB(x, y),
+                0x6 => self.SHR(x, y),
+                0x7 => self.SUBN(x, y),
+                0xE => self.SHL(x, y),
+                else => matched_instruction = false,
             },
-            0x4 => {
-                const x: u8 = payload >> 8;
-                const kk: u8 = payload - x << 8;
-                self.SNE(x, kk);
+            0x9 => self.SNE(x, y),
+            0xA => self.LDI(addr),
+            0xB => self.JPV(addr),
+            0xC => self.RND(x, byte),
+            0xD => self.DRW(x, y, nibble),
+            0xE => switch (byte) {
+                0x9E => self.SKP(x),
+                0xA1 => self.SKNP(x),
+                else => matched_instruction = false,
             },
-            0x5 => {
-                const x: u8 = payload >> 8;
-                const y: u8 = (payload - x << 8) >> 4;
-                self.SEV(x, y);
+            0xF => switch (byte) {
+                0x07 => self.LDVDT(x),
+                0x0A => self.LDVK(x),
+                0x15 => self.LDDTV(x),
+                0x18 => self.LDSTV(x),
+                0x1E => self.ADDI(x),
+                0x29 => self.LDIVX(x),
+                0x33 => self.LDBVX(x),
+                0x55 => self.LDIV0VX(x),
+                0x65 => self.LDV0VXI(x),
+                else => matched_instruction = false,
             },
-            0x6 => {
-                const x: u8 = payload >> 8;
-                const kk: u8 = payload - x << 8;
-                self.LD(x, kk);
-            },
-            0x7 => {
-                const x: u8 = payload >> 8;
-                const kk: u8 = payload - x << 8;
-                self.ADD(x, kk);
-            },
-            0x8 => {},
-            0x9 => {},
-            0xA => {},
-            0xB => {},
-            0xC => {},
-            0xD => {},
-            0xE => {},
-            0xF => {},
             else => matched_instruction = false,
         }
 
@@ -367,15 +377,15 @@ pub const Chip8VM = struct {
     /// Set *Vx* = *random byte* & *byte*
     /// Cxkk - RND Vx, byte
     // TODO: make rand part of the VM rather than the instruction
-    fn RND(self: *Chip8VM, x: u4, byte: u8, rand: std.Random) void {
-        self.V[x] = rand.intRangeAtMost(u8, 0, 255) & byte;
+    fn RND(self: *Chip8VM, x: u4, byte: u8) void {
+        self.V[x] = self.rand.intRangeAtMost(u8, 0, 255) & byte;
     }
     /// Display *n* byte sprite starting from location from *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
     /// Dxyn - DRW Vx, Vy, nibble
-    fn DRW(self: *Chip8VM, x: u4, y: u4, n: u4) void {
+    fn DRW(self: *Chip8VM, x: u4, y: u4, nibble: u4) void {
         var index: u4 = 0;
         self.V[0xF] = 0;
-        while (index < n) : (index += 1) {
+        while (index < nibble) : (index += 1) {
             const sprite_row = u64(self.memory[self.I + index]) << (64 - 8 - self.V[x]);
             const current_row = self.display[self.V[y] + index];
             const new_row = current_row ^ sprite_row;
