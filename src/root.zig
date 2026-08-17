@@ -23,10 +23,10 @@ pub const Chip8VM = struct {
     I: u16,
     /// Delay timer
     DT: u8 = 0,
-    /// Sound timer
+    /// Sound timer, use on the frontend to play a tune when non zero.
     ST: u8 = 0,
     /// Program counter
-    PC: u16,
+    PC: u16 = 512,
     /// Stack counter
     SP: u8,
     stack: [16]u16,
@@ -48,6 +48,8 @@ pub const Chip8VM = struct {
     /// Tells the frontend of the interpreter to redraw.
     /// Dont wanna be redrawing everything would you?
     needs_redraw: bool,
+    waiting_for_keypress: bool,
+    to_set_keypress_to: u8,
 
     // Methods
 
@@ -147,14 +149,44 @@ pub const Chip8VM = struct {
         // HAHAHHAHHAHAH
     }
 
+    /// Tick the interpreter state. Should be run every at 1/60th of a second.
+    /// This will tick the timers
+    fn tick(self: *Chip8VM) void {
+        self.DT -= if (self.DT > 0) 1 else 0;
+        self.ST -= if (self.ST > 0) 1 else 0;
+        run_instruction(self.memory[self.PC]);
+    }
+    /// Poll input and change state.
+    /// Call as many times as you want.
+    ///
+    /// ok obviously not like 2 billion times a second
+    fn poll_input(self: *Chip8VM, key: u4) void {
+        if (key > 15) return;
+        self.keyboard |= 1 << key;
+        if (self.waiting_for_keypress) {
+            self.waiting_for_keypress = false;
+            self.V[self.to_set_keypress_to] = key;
+        }
+    }
+    /// Runs current insturction at PC.
+    /// With the exception being when LDVK. Which doesn't do anything.
+    fn run_instruction(self: *Chip8VM) void {
+        if (self.waiting_for_keypress) return;
+        // TODO: parse and run
+        self.PC += 1;
+    }
+
+    // Instruction API
+
     /// Clear screen
     fn CLS(self: *Chip8VM) void {
         for (&self.display) |*row| row.* = 0;
+        self.needs_redraw = true;
     }
     /// Return from subroutine
     fn RET(self: *Chip8VM) void {
         self.PC = self.stack[self.SP];
-        self.SP -= 1;
+        self.SP -= if (self.SP > 0) 1 else 0;
     }
     /// Jump to address
     fn JP(self: *Chip8VM, addr: u16) void {
@@ -169,17 +201,17 @@ pub const Chip8VM = struct {
     /// Skip next instruction if *Vx* == byte
     fn SE(self: *Chip8VM, x: u8, byte: u8) void {
         if (self.V[x] == byte)
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Skip next instruction if *Vx* != byte
     fn SNE(self: *Chip8VM, x: u8, byte: u8) void {
         if (self.V[x] != byte)
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Skip next instruction if *Vx* == *Vy*
     fn SEV(self: *Chip8VM, x: u8, y: u8) void {
         if (self.V[x] == self.V[y])
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Sets a value to register *Vx*
     fn LD(self: *Chip8VM, x: u8, byte: u8) void {
@@ -234,7 +266,7 @@ pub const Chip8VM = struct {
     /// Skip next instruction if *Vx* != *Vy*
     fn SNEV(self: *Chip8VM, x: u8, y: u8) void {
         if (self.V[x] != self.V[y])
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Sets *I* to *addr*
     fn LDI(self: *Chip8VM, addr: u16) void {
@@ -261,16 +293,17 @@ pub const Chip8VM = struct {
             }
             self.display[self.V[y] + index] = new_row;
         }
+        self.needs_redraw = true;
     }
     /// Skip next instruction if key with value *Vx* is being pressed
     fn SKP(self: *Chip8VM, x: u8) void {
-        if (self.keyboard & (1 << x) > 0)
-            self.PC += 2;
+        if (self.keyboard & (1 << self.V[x]) > 0)
+            self.PC += 1;
     }
     /// Skip next instruction if key with value *Vx* is **NOT** being pressed
     fn SKNP(self: *Chip8VM, x: u8) void {
-        if (self.keyboard & (1 << x) == 0)
-            self.PC += 2;
+        if (self.keyboard & (1 << self.V[x]) == 0)
+            self.PC += 1;
     }
     /// Sets value of *DT* to register *Vx*
     fn LDVDT(self: *Chip8VM, x: u8) void {
@@ -278,7 +311,8 @@ pub const Chip8VM = struct {
     }
     /// Stop execution until a key press and store key in *Vx*
     fn LDVK(self: *Chip8VM, x: u8) void {
-        // TODO: Implement when game loop is done.
+        self.waiting_for_keypress = true;
+        self.to_set_keypress_to = x;
     }
     /// Sets value of register *Vx* to *DT*
     fn LDDTV(self: *Chip8VM, x: u8) void {
