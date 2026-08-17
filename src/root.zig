@@ -227,108 +227,131 @@ pub const Chip8VM = struct {
     // Instruction API
 
     /// Clear screen
+    /// 00E0 - CLS
     fn CLS(self: *Chip8VM) void {
         for (&self.display) |*row| row.* = 0;
         self.needs_redraw = true;
     }
     /// Return from subroutine
+    /// 00EE - RET
     fn RET(self: *Chip8VM) void {
         self.PC = self.stack[self.SP];
         self.SP -= if (self.SP > 0) 1 else 0;
     }
     /// Jump to address
+    /// 1nnn - JP addr
     fn JP(self: *Chip8VM, addr: u16) void {
         self.PC = addr;
     }
     /// Call a subroutine
+    /// 2nnn - CALL addr
     fn CALL(self: *Chip8VM, addr: u16) void {
         self.SP += 1;
         self.stack[self.SP] = self.PC;
         self.PC = addr;
     }
     /// Skip next instruction if *Vx* == byte
+    /// 3xkk - SE Vx, byte
     fn SE(self: *Chip8VM, x: u8, byte: u8) void {
         if (self.V[x] == byte)
             self.PC += 1;
     }
     /// Skip next instruction if *Vx* != byte
+    /// 4xkk - SNE Vx, byte
     fn SNE(self: *Chip8VM, x: u8, byte: u8) void {
         if (self.V[x] != byte)
             self.PC += 1;
     }
     /// Skip next instruction if *Vx* == *Vy*
+    /// 5xy0 - SE Vx, Vy
     fn SEV(self: *Chip8VM, x: u8, y: u8) void {
         if (self.V[x] == self.V[y])
             self.PC += 1;
     }
     /// Sets a value to register *Vx*
+    /// 6xkk - LD Vx, byte
     fn LD(self: *Chip8VM, x: u8, byte: u8) void {
         self.V[x] = byte;
     }
     /// Increment register *Vx* by a value
+    /// 7xkk - ADD Vx, byte
     fn ADD(self: *Chip8VM, x: u8, byte: u8) void {
         self.V[x] +%= byte;
     }
     /// Sets *Vx* to *Vy*
+    /// 8xy0 - LD Vx, Vy
     fn LDV(self: *Chip8VM, x: u8, y: u8) void {
         self.V[x] = self.V[y];
     }
     /// Sets *Vx* to *Vx* | *Vy*
+    /// 8xy1 - OR Vx, Vy
     fn OR(self: *Chip8VM, x: u8, y: u8) void {
         self.V[x] |= self.V[y];
     }
     /// Sets *Vx* to *Vx* & *Vy*
+    /// 8xy2 - AND Vx, Vy
     fn AND(self: *Chip8VM, x: u8, y: u8) void {
         self.V[x] &= self.V[y];
     }
     /// Sets *Vx* to *Vx* ^ *Vy*
+    /// 8xy3 - XOR Vx, Vy
     fn XOR(self: *Chip8VM, x: u8, y: u8) void {
         self.V[x] ^= self.V[y];
     }
     /// Sets *Vx* to *Vx* + *Vy* and *VF* as the carry out
+    /// 8xy4 - ADD Vx, Vy
     fn ADDV(self: *Chip8VM, x: u8, y: u8) void {
         const added = self.V[x] +% self.V[y];
         self.V[0xF] = if (added < self.V[x]) 1 else 0;
         self.V[x] = added;
     }
     /// Sets *Vx* to *Vx* - *Vy* and set *VF* to `!*borrow*`
+    /// 8xy5 - SUB Vx, Vy
     fn SUB(self: *Chip8VM, x: u8, y: u8) void {
         self.V[0xF] = if (self.V[x] > self.V[y]) 1 else 0;
         self.V[x] -%= self.V[y];
     }
     /// Bitwise shift *Vx* left by one and set *VF* to 1 if least significant bit is 1
+    /// 8xy6 - SHR Vx {, Vy}
     fn SHR(self: *Chip8VM, x: u8) void {
         self.V[0xF] = self.V[x] & 1;
         self.V[x] >>= 1;
     }
     /// Sets *Vx* to *Vy* - *Vx* and set *VF* to `!*borrow*`
+    /// 8xy7 - SUBN Vx, Vy
     fn SUBN(self: *Chip8VM, x: u8, y: u8) void {
         self.V[0xF] = if (self.V[y] > self.V[x]) 1 else 0;
         self.V[x] = self.V[y] -% self.V[x];
     }
-    /// Bitwise shift *Vx* left by one and set *VF* to 1 if least significant bit is 1
+    /// Bitwise shift *Vx* left by one and set *VF* to 1 if most significant bit is 1
+    /// 8xyE - SHL Vx {, Vy}
     fn SHL(self: *Chip8VM, x: u8) void {
         self.V[0xF] = (self.V[x] & 128) >> 7;
         self.V[x] <<= 1;
     }
     /// Skip next instruction if *Vx* != *Vy*
+    /// 9xy0 - SNE Vx, Vy
     fn SNEV(self: *Chip8VM, x: u8, y: u8) void {
         if (self.V[x] != self.V[y])
             self.PC += 1;
     }
     /// Sets *I* to *addr*
+    /// Annn - LD I, addr
     fn LDI(self: *Chip8VM, addr: u16) void {
         self.I = addr;
     }
     /// Jump to address + V0
+    /// Bnnn - JP V0, addr
     fn JPV(self: *Chip8VM, addr: u16) void {
         self.PC = addr + self.V[0];
     }
     /// Set *Vx* = *random byte* & *byte*
+    /// Cxkk - RND Vx, byte
     fn RND(self: *Chip8VM, x: u8, byte: u8, rand: std.Random) void {
         self.V[x] = rand.intRangeAtMost(u8, 0, 255) & byte;
     }
     /// Display *n* byte sprite starting from location from *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
+    /// Dxyn - DRW Vx, Vy, nibble
     fn DRW(self: *Chip8VM, x: u8, y: u8, n: u8) void {
         var index = 0;
         self.V[0xF] = 0;
@@ -344,46 +367,57 @@ pub const Chip8VM = struct {
         self.needs_redraw = true;
     }
     /// Skip next instruction if key with value *Vx* is being pressed
+    /// Ex9E - SKP Vx
     fn SKP(self: *Chip8VM, x: u8) void {
         if (self.keyboard & (1 << self.V[x]) > 0)
             self.PC += 1;
     }
     /// Skip next instruction if key with value *Vx* is **NOT** being pressed
+    /// ExA1 - SKNP Vx
     fn SKNP(self: *Chip8VM, x: u8) void {
         if (self.keyboard & (1 << self.V[x]) == 0)
             self.PC += 1;
     }
     /// Sets value of *DT* to register *Vx*
+    /// Fx07 - LD Vx, DT
     fn LDVDT(self: *Chip8VM, x: u8) void {
         self.V[x] = self.DT;
     }
     /// Stop execution until a key press and store key in *Vx*
+    /// Fx0A - LD Vx, K
     fn LDVK(self: *Chip8VM, x: u8) void {
         self.waiting_for_keypress = true;
         self.to_set_keypress_to = x;
     }
     /// Sets value of register *Vx* to *DT*
+    /// Fx15 - LD DT, Vx
     fn LDDTV(self: *Chip8VM, x: u8) void {
         self.DT = self.V[x];
     }
     /// Sets value of register *Vx* to *ST*
+    /// Fx18 - LD ST, Vx
     fn LDSTV(self: *Chip8VM, x: u8) void {
         self.ST = self.V[x];
     }
     /// Increment register *I* by the value of *Vx*
+    /// Fx1E - ADD I, Vx
     fn ADDI(self: *Chip8VM, x: u8) void {
         self.I +%= self.V[x];
     }
+    /// Sets *I* to the digit sprite of *Vx*
+    /// Fx29 - LD F, Vx
     fn LDIVX(self: *Chip8VM, x: u8) void {
         self.I = self.V[x] * 5;
     }
     /// Places the digits of *Vx* to I, I+1 and I+2
+    /// Fx33 - LD B, Vx
     fn LDBVX(self: *Chip8VM, x: u8) void {
         self.memory[self.I + 0] = self.V[x] / 100 % 10;
         self.memory[self.I + 1] = self.V[x] / 10 % 10;
         self.memory[self.I + 2] = self.V[x] / 1 % 10;
     }
     /// Stores values of *V0* to *Vx* starting from address at value of *I*
+    /// Fx55 - LD [I], Vx
     fn LDIV0VX(self: *Chip8VM, x: u8) void {
         var index = 0;
         while (index <= x) : (index += 1) {
@@ -391,6 +425,7 @@ pub const Chip8VM = struct {
         }
     }
     /// Reads values starting at address of *I*s value to *V0* to *Vx*
+    /// Fx65 - LD Vx, [I]
     fn LDV0VXI(self: *Chip8VM, x: u8) void {
         var index = 0;
         while (index <= x) : (index += 1) {
