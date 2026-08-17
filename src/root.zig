@@ -23,10 +23,10 @@ pub const Chip8VM = struct {
     I: u16,
     /// Delay timer
     DT: u8 = 0,
-    /// Sound timer
+    /// Sound timer, use on the frontend to play a tune when non zero.
     ST: u8 = 0,
     /// Program counter
-    PC: u16,
+    PC: u16 = 512,
     /// Stack counter
     SP: u8,
     stack: [16]u16,
@@ -45,15 +45,23 @@ pub const Chip8VM = struct {
 
     // Interpreter related
 
+    /// The rng of the Chip8, set as you please.
+    rand: std.Random,
+
     /// Tells the frontend of the interpreter to redraw.
     /// Dont wanna be redrawing everything would you?
     needs_redraw: bool,
+    /// For instruction LDVK (Fx0A)
+    waiting_for_keypress: bool,
+    /// Paired with `waiting_for_keypress`.
+    /// Stores which register to write to.
+    to_set_keypress_to: u4,
 
     // Methods
 
     /// Loads the ROM code into memory.
     /// Given a reader to the file.
-    fn init_code(self: *Chip8VM, reader: *std.Io.Reader) void {
+    fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) void {
         // ok so had to gemini this one
         try reader.readSliceShort(&self.memory[512..]);
     }
@@ -147,169 +155,307 @@ pub const Chip8VM = struct {
         // HAHAHHAHHAHAH
     }
 
+    /// Tick the interpreter state. Should be run every at 1/60th of a second.
+    /// This will tick the timers
+    fn tick(self: *Chip8VM) void {
+        self.DT -= if (self.DT > 0) 1 else 0;
+        self.ST -= if (self.ST > 0) 1 else 0;
+
+        // TODO: wtf is this ethical?
+        // like should the timer and running instructions be separate?
+        // yeahh i think so
+        // lets just make it up to the frontend
+        // how about that?
+        run_instruction(self.memory[self.PC]);
+    }
+    /// Poll input and change state.
+    /// Call as many times as you want.
+    ///
+    /// ok obviously not like 2 billion times a second
+    fn poll_input(self: *Chip8VM, key: u4) void {
+        self.keyboard |= 1 << key;
+        if (self.waiting_for_keypress) {
+            self.waiting_for_keypress = false;
+            self.V[self.to_set_keypress_to] = key;
+        }
+    }
+    /// Runs current insturction at PC.
+    /// With the exception being when LDVK. Which doesn't do anything.
+    fn run_instruction(self: *Chip8VM) void {
+        if (self.waiting_for_keypress) return;
+
+        // values of the instruction
+        const instruction: u16 = u16(self.memory[self.PC]) << 8 + self.memory[self.PC + 1];
+        const header: u4 = self.memory[self.PC] >> 4;
+        const addr: u12 = (u12(self.memory[self.PC] % 0x10) << 8) + self.memory[self.PC + 1];
+        const nibble: u12 = self.memory[self.PC + 1] % 0x10;
+        const x: u4 = self.memory[self.PC] % 0x10;
+        const y: u4 = self.memory[self.PC + 1] >> 4;
+        const byte: u8 = self.memory[self.PC + 1];
+
+        var matched_instruction = true;
+
+        switch (header) {
+            0x0 => {
+                switch (instruction) {
+                    0x00E0 => self.CLS(),
+                    0x00EE => self.RET(),
+                    else => matched_instruction = false,
+                }
+            },
+            0x1 => self.JP(addr),
+            0x2 => self.CALL(addr),
+            0x3 => self.SE(x, byte),
+            0x4 => self.SNE(x, byte),
+            0x5 => self.SEV(x, y),
+            0x6 => self.LD(x, byte),
+            0x7 => self.ADD(x, byte),
+            0x8 => switch (nibble) {
+                0x0 => self.LDV(x, y),
+                0x1 => self.OR(x, y),
+                0x2 => self.AND(x, y),
+                0x3 => self.XOR(x, y),
+                0x4 => self.ADDV(x, y),
+                0x5 => self.SUB(x, y),
+                0x6 => self.SHR(x, y),
+                0x7 => self.SUBN(x, y),
+                0xE => self.SHL(x, y),
+                else => matched_instruction = false,
+            },
+            0x9 => self.SNE(x, y),
+            0xA => self.LDI(addr),
+            0xB => self.JPV(addr),
+            0xC => self.RND(x, byte),
+            0xD => self.DRW(x, y, nibble),
+            0xE => switch (byte) {
+                0x9E => self.SKP(x),
+                0xA1 => self.SKNP(x),
+                else => matched_instruction = false,
+            },
+            0xF => switch (byte) {
+                0x07 => self.LDVDT(x),
+                0x0A => self.LDVK(x),
+                0x15 => self.LDDTV(x),
+                0x18 => self.LDSTV(x),
+                0x1E => self.ADDI(x),
+                0x29 => self.LDIVX(x),
+                0x33 => self.LDBVX(x),
+                0x55 => self.LDIV0VX(x),
+                0x65 => self.LDV0VXI(x),
+                else => matched_instruction = false,
+            },
+            else => matched_instruction = false,
+        }
+
+        if (matched_instruction)
+            self.PC += 1;
+    }
+
+    // Instruction API
+
     /// Clear screen
+    /// 00E0 - CLS
     fn CLS(self: *Chip8VM) void {
         for (&self.display) |*row| row.* = 0;
+        self.needs_redraw = true;
     }
     /// Return from subroutine
+    /// 00EE - RET
     fn RET(self: *Chip8VM) void {
         self.PC = self.stack[self.SP];
-        self.SP -= 1;
+        self.SP -= if (self.SP > 0) 1 else 0;
     }
     /// Jump to address
-    fn JP(self: *Chip8VM, addr: u16) void {
+    /// 1nnn - JP addr
+    fn JP(self: *Chip8VM, addr: u12) void {
         self.PC = addr;
     }
     /// Call a subroutine
-    fn CALL(self: *Chip8VM, addr: u16) void {
+    /// 2nnn - CALL addr
+    fn CALL(self: *Chip8VM, addr: u12) void {
         self.SP += 1;
         self.stack[self.SP] = self.PC;
         self.PC = addr;
     }
     /// Skip next instruction if *Vx* == byte
-    fn SE(self: *Chip8VM, x: u8, byte: u8) void {
+    /// 3xkk - SE Vx, byte
+    fn SE(self: *Chip8VM, x: u4, byte: u8) void {
         if (self.V[x] == byte)
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Skip next instruction if *Vx* != byte
-    fn SNE(self: *Chip8VM, x: u8, byte: u8) void {
+    /// 4xkk - SNE Vx, byte
+    fn SNE(self: *Chip8VM, x: u4, byte: u8) void {
         if (self.V[x] != byte)
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Skip next instruction if *Vx* == *Vy*
-    fn SEV(self: *Chip8VM, x: u8, y: u8) void {
+    /// 5xy0 - SE Vx, Vy
+    fn SEV(self: *Chip8VM, x: u4, y: u4) void {
         if (self.V[x] == self.V[y])
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Sets a value to register *Vx*
-    fn LD(self: *Chip8VM, x: u8, byte: u8) void {
+    /// 6xkk - LD Vx, byte
+    fn LD(self: *Chip8VM, x: u4, byte: u8) void {
         self.V[x] = byte;
     }
     /// Increment register *Vx* by a value
-    fn ADD(self: *Chip8VM, x: u8, byte: u8) void {
+    /// 7xkk - ADD Vx, byte
+    fn ADD(self: *Chip8VM, x: u4, byte: u8) void {
         self.V[x] +%= byte;
     }
     /// Sets *Vx* to *Vy*
-    fn LDV(self: *Chip8VM, x: u8, y: u8) void {
+    /// 8xy0 - LD Vx, Vy
+    fn LDV(self: *Chip8VM, x: u4, y: u4) void {
         self.V[x] = self.V[y];
     }
     /// Sets *Vx* to *Vx* | *Vy*
-    fn OR(self: *Chip8VM, x: u8, y: u8) void {
+    /// 8xy1 - OR Vx, Vy
+    fn OR(self: *Chip8VM, x: u4, y: u4) void {
         self.V[x] |= self.V[y];
     }
     /// Sets *Vx* to *Vx* & *Vy*
-    fn AND(self: *Chip8VM, x: u8, y: u8) void {
+    /// 8xy2 - AND Vx, Vy
+    fn AND(self: *Chip8VM, x: u4, y: u4) void {
         self.V[x] &= self.V[y];
     }
     /// Sets *Vx* to *Vx* ^ *Vy*
-    fn XOR(self: *Chip8VM, x: u8, y: u8) void {
+    /// 8xy3 - XOR Vx, Vy
+    fn XOR(self: *Chip8VM, x: u4, y: u4) void {
         self.V[x] ^= self.V[y];
     }
     /// Sets *Vx* to *Vx* + *Vy* and *VF* as the carry out
-    fn ADDV(self: *Chip8VM, x: u8, y: u8) void {
+    /// 8xy4 - ADD Vx, Vy
+    fn ADDV(self: *Chip8VM, x: u4, y: u4) void {
         const added = self.V[x] +% self.V[y];
         self.V[0xF] = if (added < self.V[x]) 1 else 0;
         self.V[x] = added;
     }
     /// Sets *Vx* to *Vx* - *Vy* and set *VF* to `!*borrow*`
-    fn SUB(self: *Chip8VM, x: u8, y: u8) void {
+    /// 8xy5 - SUB Vx, Vy
+    fn SUB(self: *Chip8VM, x: u4, y: u4) void {
         self.V[0xF] = if (self.V[x] > self.V[y]) 1 else 0;
         self.V[x] -%= self.V[y];
     }
     /// Bitwise shift *Vx* left by one and set *VF* to 1 if least significant bit is 1
-    fn SHR(self: *Chip8VM, x: u8) void {
+    /// 8xy6 - SHR Vx {, Vy}
+    fn SHR(self: *Chip8VM, x: u4, y: u4) void {
+        _ = y; // yes, y is not used. but its part of the operation so i guess well keep it? (genuinely why did they do this)
         self.V[0xF] = self.V[x] & 1;
         self.V[x] >>= 1;
     }
     /// Sets *Vx* to *Vy* - *Vx* and set *VF* to `!*borrow*`
-    fn SUBN(self: *Chip8VM, x: u8, y: u8) void {
+    /// 8xy7 - SUBN Vx, Vy
+    fn SUBN(self: *Chip8VM, x: u4, y: u4) void {
         self.V[0xF] = if (self.V[y] > self.V[x]) 1 else 0;
         self.V[x] = self.V[y] -% self.V[x];
     }
-    /// Bitwise shift *Vx* left by one and set *VF* to 1 if least significant bit is 1
-    fn SHL(self: *Chip8VM, x: u8) void {
+    /// Bitwise shift *Vx* left by one and set *VF* to 1 if most significant bit is 1
+    /// 8xyE - SHL Vx {, Vy}
+    fn SHL(self: *Chip8VM, x: u4, y: u4) void {
+        _ = y; // yes, y is not used. but its part of the operation so i guess well keep it? (genuinely why did they do this)
         self.V[0xF] = (self.V[x] & 128) >> 7;
         self.V[x] <<= 1;
     }
     /// Skip next instruction if *Vx* != *Vy*
-    fn SNEV(self: *Chip8VM, x: u8, y: u8) void {
+    /// 9xy0 - SNE Vx, Vy
+    fn SNEV(self: *Chip8VM, x: u4, y: u4) void {
         if (self.V[x] != self.V[y])
-            self.PC += 2;
+            self.PC += 1;
     }
     /// Sets *I* to *addr*
-    fn LDI(self: *Chip8VM, addr: u16) void {
+    /// Annn - LD I, addr
+    fn LDI(self: *Chip8VM, addr: u12) void {
         self.I = addr;
     }
     /// Jump to address + V0
-    fn JPV(self: *Chip8VM, addr: u16) void {
+    /// Bnnn - JP V0, addr
+    fn JPV(self: *Chip8VM, addr: u12) void {
         self.PC = addr + self.V[0];
     }
     /// Set *Vx* = *random byte* & *byte*
-    fn RND(self: *Chip8VM, x: u8, byte: u8, rand: std.Random) void {
-        self.V[x] = rand.intRangeAtMost(u8, 0, 255) & byte;
+    /// Cxkk - RND Vx, byte
+    // TODO: make rand part of the VM rather than the instruction
+    fn RND(self: *Chip8VM, x: u4, byte: u8) void {
+        self.V[x] = self.rand.intRangeAtMost(u8, 0, 255) & byte;
     }
     /// Display *n* byte sprite starting from location from *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
-    fn DRW(self: *Chip8VM, x: u8, y: u8, n: u8) void {
-        var index = 0;
+    /// Dxyn - DRW Vx, Vy, nibble
+    fn DRW(self: *Chip8VM, x: u4, y: u4, nibble: u4) void {
+        var index: u4 = 0;
         self.V[0xF] = 0;
-        while (index < n) : (index += 1) {
+        while (index < nibble) : (index += 1) {
             const sprite_row = u64(self.memory[self.I + index]) << (64 - 8 - self.V[x]);
             const current_row = self.display[self.V[y] + index];
             const new_row = current_row ^ sprite_row;
-            if (current_row > current_row & new_row) {
+            if (current_row > current_row & new_row)
                 self.V[0xF] = 1;
-            }
             self.display[self.V[y] + index] = new_row;
         }
+        self.needs_redraw = true;
     }
     /// Skip next instruction if key with value *Vx* is being pressed
-    fn SKP(self: *Chip8VM, x: u8) void {
-        if (self.keyboard & (1 << x) > 0)
-            self.PC += 2;
+    /// Ex9E - SKP Vx
+    fn SKP(self: *Chip8VM, x: u4) void {
+        if (self.keyboard & (1 << self.V[x]) > 0)
+            self.PC += 1;
     }
     /// Skip next instruction if key with value *Vx* is **NOT** being pressed
-    fn SKNP(self: *Chip8VM, x: u8) void {
-        if (self.keyboard & (1 << x) == 0)
-            self.PC += 2;
+    /// ExA1 - SKNP Vx
+    fn SKNP(self: *Chip8VM, x: u4) void {
+        if (self.keyboard & (1 << self.V[x]) == 0)
+            self.PC += 1;
     }
     /// Sets value of *DT* to register *Vx*
-    fn LDVDT(self: *Chip8VM, x: u8) void {
+    /// Fx07 - LD Vx, DT
+    fn LDVDT(self: *Chip8VM, x: u4) void {
         self.V[x] = self.DT;
     }
     /// Stop execution until a key press and store key in *Vx*
-    fn LDVK(self: *Chip8VM, x: u8) void {
-        // TODO: Implement when game loop is done.
+    /// Fx0A - LD Vx, K
+    fn LDVK(self: *Chip8VM, x: u4) void {
+        self.waiting_for_keypress = true;
+        self.to_set_keypress_to = x;
     }
     /// Sets value of register *Vx* to *DT*
-    fn LDDTV(self: *Chip8VM, x: u8) void {
+    /// Fx15 - LD DT, Vx
+    fn LDDTV(self: *Chip8VM, x: u4) void {
         self.DT = self.V[x];
     }
     /// Sets value of register *Vx* to *ST*
-    fn LDSTV(self: *Chip8VM, x: u8) void {
+    /// Fx18 - LD ST, Vx
+    fn LDSTV(self: *Chip8VM, x: u4) void {
         self.ST = self.V[x];
     }
     /// Increment register *I* by the value of *Vx*
-    fn ADDI(self: *Chip8VM, x: u8) void {
+    /// Fx1E - ADD I, Vx
+    fn ADDI(self: *Chip8VM, x: u4) void {
         self.I +%= self.V[x];
     }
-    fn LDIVX(self: *Chip8VM, x: u8) void {
+    /// Sets *I* to the digit sprite of *Vx*
+    /// Fx29 - LD F, Vx
+    fn LDIVX(self: *Chip8VM, x: u4) void {
         self.I = self.V[x] * 5;
     }
     /// Places the digits of *Vx* to I, I+1 and I+2
-    fn LDBVX(self: *Chip8VM, x: u8) void {
+    /// Fx33 - LD B, Vx
+    fn LDBVX(self: *Chip8VM, x: u4) void {
         self.memory[self.I + 0] = self.V[x] / 100 % 10;
         self.memory[self.I + 1] = self.V[x] / 10 % 10;
         self.memory[self.I + 2] = self.V[x] / 1 % 10;
     }
     /// Stores values of *V0* to *Vx* starting from address at value of *I*
-    fn LDIV0VX(self: *Chip8VM, x: u8) void {
+    /// Fx55 - LD [I], Vx
+    fn LDIV0VX(self: *Chip8VM, x: u4) void {
         var index = 0;
         while (index <= x) : (index += 1) {
             self.memory[self.I + index] = self.V[index];
         }
     }
     /// Reads values starting at address of *I*s value to *V0* to *Vx*
-    fn LDV0VXI(self: *Chip8VM, x: u8) void {
+    /// Fx65 - LD Vx, [I]
+    fn LDV0VXI(self: *Chip8VM, x: u4) void {
         var index = 0;
         while (index <= x) : (index += 1) {
             self.V[index] = self.memory[self.I + index];
