@@ -172,7 +172,55 @@ pub const Chip8VM = struct {
     /// With the exception being when LDVK. Which doesn't do anything.
     fn run_instruction(self: *Chip8VM) void {
         if (self.waiting_for_keypress) return;
-        // TODO: parse and run
+
+        const current_instruction: u16 = self.memory[self.PC] << 8 + self.memory[self.PC + 1];
+        const header: u8 = current_instruction >> 12;
+        const payload: u16 = current_instruction - header << 12;
+        switch (header) {
+            0x0 => {
+                switch (payload) {
+                    0x0E0 => self.CLS(),
+                    0x0EE => self.RET(),
+                    else => {},
+                }
+            },
+            0x1 => self.JP(payload),
+            0x2 => self.CALL(payload),
+            0x3 => {
+                const x: u8 = payload >> 8;
+                const kk: u8 = payload - x << 8;
+                self.SE(x, kk);
+            },
+            0x4 => {
+                const x: u8 = payload >> 8;
+                const kk: u8 = payload - x << 8;
+                self.SNE(x, kk);
+            },
+            0x5 => {
+                const x: u8 = payload >> 8;
+                const y: u8 = (payload - x << 8) >> 4;
+                self.SEV(x, y);
+            },
+            0x6 => {
+                const x: u8 = payload >> 8;
+                const kk: u8 = payload - x << 8;
+                self.LD(x, kk);
+            },
+            0x7 => {
+                const x: u8 = payload >> 8;
+                const kk: u8 = payload - x << 8;
+                self.ADD(x, kk);
+            },
+            0x8 => {},
+            0x9 => {},
+            0xA => {},
+            0xB => {},
+            0xC => {},
+            0xD => {},
+            0xE => {},
+            0xF => {},
+            else => {},
+        }
         self.PC += 1;
     }
 
