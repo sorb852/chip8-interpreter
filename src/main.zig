@@ -1,38 +1,31 @@
 const std = @import("std");
+const rl = @import("raylib");
 
 const ziggy = @import("ziggy");
 
-fn draw_chip8_display(vm: *ziggy.Chip8VM, output: *std.Io.Writer) void {
-    for (vm.display) |row| {
-        var index: u64 = 1 << 63;
-        while (index > 0) : (index <<= 1)
-            output.print("{s}", .{if ((row & index) != 0) "█" else " "});
-        output.print("\n");
-    }
-}
-
 pub fn main(init: std.process.Init) !void {
-    const arena: std.mem.Allocator = init.arena.allocator();
-    const io = init.io;
+    _ = init; // wtf i dont need it now?
+    // const arena: std.mem.Allocator = init.arena.allocator();
+    const screenWidth = 64;
+    const screenHeight = 32;
 
-    // stdout boilerplate
-    var stdout_buffer: [512]u8 = undefined;
-    var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
-    const stdout = &stdout_file_writer.interface;
+    rl.initWindow(screenWidth, screenHeight, "chip8 emulator");
+    defer rl.closeWindow(); // js close as it ends lol
 
-    var prng: std.Random.DefaultPrng = .init(blk: {
-        var seed: u64 = undefined;
-        try std.posix.getrandom(std.mem.asBytes(&seed));
-        break :blk seed;
-    });
+    rl.setTargetFPS(60);
 
-    var chip8 = ziggy.Chip8VM;
-    chip8.rand = prng.random();
-    // TODO: read
+    // var prng: std.Random.DefaultPrng = .init(blk: {
+    //     var seed: u64 = undefined;
+    //     try std.posix.getrandom(std.mem.asBytes(&seed));
+    //     break :blk seed;
+    // });
+    //
+    // var chip8 = ziggy.Chip8VM;
+    // chip8.rand = prng.random();
 
-    while (!chip8.finished) {
-        // TODO: chip8.poll_input();
-        chip8.tick();
-        draw_chip8_display(&chip8, &stdout);
+    while (!rl.windowShouldClose()) {
+        rl.beginDrawing();
+        defer rl.endDrawing(); // ok nvm this is cool asf
+        rl.clearBackground(.ray_white);
     }
 }
