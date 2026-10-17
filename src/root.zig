@@ -16,9 +16,9 @@ const std = @import("std");
 /// Running games, "*managing*" memory, storing registers and all that.
 pub const Chip8VM = struct {
     /// Starts main game memory at 512
-    memory: [4096]u8 = [0]**4096,
+    memory: [4096]u8 = @splat(0),
     /// *V* registers, from *V0* to *VF*
-    V: [16]u8 = [0]**16,
+    V: [16]u8 = @splat(0),
     /// *I* register
     I: u16 = 0,
     /// Delay timer
@@ -29,7 +29,7 @@ pub const Chip8VM = struct {
     PC: u16 = 512,
     /// Stack counter
     SP: u8 = 0,
-    stack: [16]u16 = [0]**16,
+    stack: [16]u16 = @splat(0),
     /// Keypad represented as such
     /// Shift to get placement of the pad
     /// ```
@@ -41,7 +41,7 @@ pub const Chip8VM = struct {
     /// To get the top middle (2), you must *keyboard* & (1 << 2) to get if the key is pressed or not
     keyboard: u16 = 0,
     /// Stores the display. Each row of pixels is a bit represented using unsigned 64 bit integer
-    display: u64[32] = [0]**32,
+    display: [32]u64 = @splat(0),
 
     // Interpreter related
 

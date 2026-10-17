@@ -30,6 +30,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    exe.use_llvm = true;
+    exe.use_lld = true;
     exe.root_module.linkLibrary(raylib_artifact);
     exe.root_module.addImport("raylib", raylib);
     exe.root_module.addImport("raygui", raygui);
