@@ -63,15 +63,15 @@ pub const Chip8VM = struct {
 
     /// Loads the ROM code into memory.
     /// Given a reader to the file.
-    fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) void {
+    pub fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) !void {
         // ok so had to gemini this one
-        try reader.readSliceShort(&self.memory[512..]);
+        _ = try reader.readSliceShort(self.memory[512..]);
         self.finished = false;
     }
 
     /// Initialize the hex sprites.
     /// Starts from 0 to 79, with each sprite having 5 bytes.
-    fn init_sprites(self: *Chip8VM) void {
+    pub fn init_sprites(self: *Chip8VM) void {
         // im so fucking lazy
         // im js gonna make gemini do this like its so damn boring
         // OOOOR GET PYTHON TO DO IT
@@ -160,7 +160,7 @@ pub const Chip8VM = struct {
 
     /// Tick the interpreter state. Should be run every at 1/60th of a second.
     /// This will tick the timers
-    fn tick(self: *Chip8VM) void {
+    pub fn tick(self: *Chip8VM) void {
         if (self.finished) return;
 
         self.DT -= if (self.DT > 0) 1 else 0;
@@ -171,7 +171,7 @@ pub const Chip8VM = struct {
         // yeahh i think so
         // lets just make it up to the frontend
         // how about that?
-        run_instruction(self.memory[self.PC]);
+        self.run_instruction();
 
         // TODO: implement a better way to check for exit
         if (self.PC >= 0x200 and self.memory[self.PC] == 0)
@@ -181,7 +181,7 @@ pub const Chip8VM = struct {
     /// Call as many times as you want.
     ///
     /// ok obviously not like 2 billion times a second
-    fn poll_input(self: *Chip8VM, key: u4) void {
+    pub fn poll_input(self: *Chip8VM, key: u4) void {
         self.keyboard |= 1 << key;
         if (self.waiting_for_keypress) {
             self.waiting_for_keypress = false;
@@ -193,14 +193,15 @@ pub const Chip8VM = struct {
     fn run_instruction(self: *Chip8VM) void {
         if (self.waiting_for_keypress) return;
 
-        // values of the instruction
-        const instruction: u16 = u16(self.memory[self.PC]) << 8 + self.memory[self.PC + 1];
-        const header: u4 = self.memory[self.PC] >> 4;
-        const addr: u12 = (u12(self.memory[self.PC] % 0x10) << 8) + self.memory[self.PC + 1];
-        const nibble: u12 = self.memory[self.PC + 1] % 0x10;
-        const x: u4 = self.memory[self.PC] % 0x10;
-        const y: u4 = self.memory[self.PC + 1] >> 4;
-        const byte: u8 = self.memory[self.PC + 1];
+        const instruction = (@as(u16, self.memory[self.PC]) << 8) | self.memory[self.PC + 1];
+
+        // oh right bit masks exist
+        const header: u4 = @truncate((instruction & 0xF000) >> 12);
+        const addr: u12 = @truncate((instruction & 0x0FFF) >> 0);
+        const nibble: u4 = @truncate((instruction & 0x000F) >> 0);
+        const x: u4 = @truncate((instruction & 0x0F00) >> 0);
+        const y: u4 = @truncate((instruction & 0x00F0) >> 0);
+        const byte: u8 = @truncate((instruction & 0x000F) >> 0);
 
         var matched_instruction = true;
 
@@ -253,7 +254,6 @@ pub const Chip8VM = struct {
                 0x65 => self.LDV0VXI(x),
                 else => matched_instruction = false,
             },
-            else => matched_instruction = false,
         }
 
         if (matched_instruction)
@@ -389,13 +389,13 @@ pub const Chip8VM = struct {
     fn RND(self: *Chip8VM, x: u4, byte: u8) void {
         self.V[x] = self.rand.intRangeAtMost(u8, 0, 255) & byte;
     }
-    /// Display *n* byte sprite starting from location from *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
+    /// Display *n* byte sprite starting from location *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
     /// Dxyn - DRW Vx, Vy, nibble
     fn DRW(self: *Chip8VM, x: u4, y: u4, nibble: u4) void {
         var index: u4 = 0;
         self.V[0xF] = 0;
         while (index < nibble) : (index += 1) {
-            const sprite_row = u64(self.memory[self.I + index]) << (64 - 8 - self.V[x]);
+            const sprite_row = @as(u64, self.memory[self.I + index]) << @truncate((64 - 8 - self.V[x]) & 63);
             const current_row = self.display[self.V[y] + index];
             const new_row = current_row ^ sprite_row;
             if (current_row > current_row & new_row)
@@ -407,13 +407,13 @@ pub const Chip8VM = struct {
     /// Skip next instruction if key with value *Vx* is being pressed
     /// Ex9E - SKP Vx
     fn SKP(self: *Chip8VM, x: u4) void {
-        if (self.keyboard & (1 << self.V[x]) > 0)
+        if (self.keyboard & (@as(u16, 1) << @truncate(self.V[x] & 0x0F)) > 0)
             self.PC += 1;
     }
     /// Skip next instruction if key with value *Vx* is **NOT** being pressed
     /// ExA1 - SKNP Vx
     fn SKNP(self: *Chip8VM, x: u4) void {
-        if (self.keyboard & (1 << self.V[x]) == 0)
+        if (self.keyboard & (@as(u16, 1) << @truncate(self.V[x] & 0x0F)) == 0)
             self.PC += 1;
     }
     /// Sets value of *DT* to register *Vx*
@@ -457,7 +457,7 @@ pub const Chip8VM = struct {
     /// Stores values of *V0* to *Vx* starting from address at value of *I*
     /// Fx55 - LD [I], Vx
     fn LDIV0VX(self: *Chip8VM, x: u4) void {
-        var index = 0;
+        var index: u4 = 0;
         while (index <= x) : (index += 1) {
             self.memory[self.I + index] = self.V[index];
         }
@@ -465,7 +465,7 @@ pub const Chip8VM = struct {
     /// Reads values starting at address of *I*s value to *V0* to *Vx*
     /// Fx65 - LD Vx, [I]
     fn LDV0VXI(self: *Chip8VM, x: u4) void {
-        var index = 0;
+        var index: u4 = 0;
         while (index <= x) : (index += 1) {
             self.V[index] = self.memory[self.I + index];
         }

@@ -4,7 +4,6 @@ const rl = @import("raylib");
 const ziggy = @import("ziggy");
 
 pub fn main(init: std.process.Init) !void {
-    _ = init; // wtf i dont need it now?
     // const arena: std.mem.Allocator = init.arena.allocator();
     const scale = 16;
     const screenWidth = 64 * scale;
@@ -17,12 +16,23 @@ pub fn main(init: std.process.Init) !void {
 
     var prng: std.Random.DefaultPrng = .init(0);
 
-    const chip8: ziggy.Chip8VM = .{ .rand = prng.random() };
+    var chip8: ziggy.Chip8VM = .{ .rand = prng.random() };
 
-    while (!rl.windowShouldClose()) {
+    var buf: [4096 - 512]u8 = undefined;
+    // const rom = try std.Io.Dir.cwd().openFile(std.Io, "pong.ch8",  .{});
+    const rom = try std.Io.Dir.cwd().openFile(init.io, "pong.ch8", .{});
+    var romReader = rom.reader(init.io, &buf);
+    defer rom.close(init.io);
+
+    chip8.init_sprites();
+    try chip8.init_rom(&romReader.interface);
+
+    while (!rl.windowShouldClose() and !chip8.finished) {
         rl.beginDrawing();
         defer rl.endDrawing(); // ok nvm this is cool asf
         rl.clearBackground(.black);
+
+        chip8.tick();
 
         var x: u6 = 0;
         var y: u6 = 0;
