@@ -174,18 +174,23 @@ pub const Chip8VM = struct {
         self.run_instruction();
 
         // TODO: implement a better way to check for exit
-        if (self.PC >= 0x200 and self.memory[self.PC] == 0)
-            self.finished = true;
+        // FIX: this just sucks bro holy shit
+        // if (self.PC >= 0x200 and self.memory[self.PC] == 0)
+        //     self.finished = true;
     }
     /// Poll input and change state.
     /// Call as many times as you want.
     ///
     /// ok obviously not like 2 billion times a second
-    pub fn poll_input(self: *Chip8VM, key: u4) void {
-        self.keyboard |= 1 << key;
-        if (self.waiting_for_keypress) {
-            self.waiting_for_keypress = false;
-            self.V[self.to_set_keypress_to] = key;
+    pub fn poll_input(self: *Chip8VM, key: u4, up: bool) void {
+        if (up) {
+            if (self.waiting_for_keypress and (self.keyboard & (@as(u16, 1) << key) != 0)) {
+                self.waiting_for_keypress = false;
+                self.V[self.to_set_keypress_to] = key;
+            }
+            self.keyboard |= @as(u16, 1) << key;
+        } else {
+            self.keyboard &= ~(@as(u16, 1) << key);
         }
     }
     /// Runs current insturction at PC.
@@ -201,10 +206,10 @@ pub const Chip8VM = struct {
         const nibble: u4 = @truncate((instruction & 0x000F) >> 0);
         const x: u4 = @truncate((instruction & 0x0F00) >> 8);
         const y: u4 = @truncate((instruction & 0x00F0) >> 4);
-        const byte: u8 = @truncate((instruction & 0x000F) >> 0);
+        const byte: u8 = @truncate((instruction & 0x00FF) >> 0);
 
-        std.debug.print("[INFO] Matching instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
-        std.debug.print("[INFO] header: 0x{x}, addr: 0x{x:0>3}, nibble: {}, x: {}, y: {}, byte: 0b{b:0>8}\n", .{ header, addr, nibble, x, y, byte });
+        // std.debug.print("[INFO] Matching instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
+        // std.debug.print("[INFO] header: 0x{x}, addr: 0x{x:0>3}, nibble: {}, x: {}, y: {}, byte: 0b{b:0>8}\n", .{ header, addr, nibble, x, y, byte });
 
         var matched_instruction = true;
 
@@ -214,7 +219,7 @@ pub const Chip8VM = struct {
                     0x00E0 => self.CLS(),
                     0x00EE => self.RET(),
                     else => {
-                        std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
+                        // std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
                         matched_instruction = false;
                     },
                 }
@@ -237,7 +242,7 @@ pub const Chip8VM = struct {
                 0x7 => self.SUBN(x, y),
                 0xE => self.SHL(x, y),
                 else => {
-                    std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
+                    // std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
                     matched_instruction = false;
                 },
             },
@@ -250,7 +255,7 @@ pub const Chip8VM = struct {
                 0x9E => self.SKP(x),
                 0xA1 => self.SKNP(x),
                 else => {
-                    std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
+                    // std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
                     matched_instruction = false;
                 },
             },
@@ -265,7 +270,7 @@ pub const Chip8VM = struct {
                 0x55 => self.LDIV0VX(x),
                 0x65 => self.LDV0VXI(x),
                 else => {
-                    std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
+                    // std.debug.print("[FAIL] Unknown instruction at 0x{x:0>3}: 0x{x:0>4}\n", .{ self.PC, instruction });
                     matched_instruction = false;
                 },
             },
@@ -434,7 +439,7 @@ pub const Chip8VM = struct {
                 @as(u64, self.memory[self.I + index]) << @intCast(56 - vx)
             else
                 @as(u64, self.memory[self.I + index]) >> @intCast(vx - 56);
-            const current_row = self.display[self.V[y] + index];
+            const current_row = self.display[vy];
             if ((current_row & sprite_row) != 0)
                 self.V[0xF] = 1;
 
@@ -442,11 +447,6 @@ pub const Chip8VM = struct {
         }
         self.needs_redraw = true;
         self.PC += 2;
-
-        // var shi: u5 = 0;
-        // while (shi < 31) : (shi += 1) {
-        //     std.debug.print("{b:0>64}\n", .{self.display[shi]});
-        // }
     }
     /// Skip next instruction if key with value *Vx* is being pressed
     /// Ex9E - SKP Vx
