@@ -20,7 +20,7 @@ pub fn main(init: std.process.Init) !void {
 
     var buf: [4096 - 512]u8 = undefined;
     // const rom = try std.Io.Dir.cwd().openFile(std.Io, "pong.ch8",  .{});
-    const rom = try std.Io.Dir.cwd().openFile(init.io, "pong.ch8", .{});
+    const rom = try std.Io.Dir.cwd().openFile(init.io, "ibm.ch8", .{});
     var romReader = rom.reader(init.io, &buf);
     defer rom.close(init.io);
 
@@ -42,5 +42,10 @@ pub fn main(init: std.process.Init) !void {
                 if (chip8.display[y] & (@as(u64, 1) << (63 - x)) == 1) rl.drawRectangle(x * scale, y * scale, scale, scale, .white);
             }
         }
+    }
+
+    var typeshi: u8 = 0;
+    while (typeshi < 32) : (typeshi += 1) {
+        std.debug.print("{b:0>64}\n", .{chip8.display[typeshi]});
     }
 }
