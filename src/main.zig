@@ -34,18 +34,13 @@ pub fn main(init: std.process.Init) !void {
 
         chip8.tick();
 
-        var x: u6 = 0;
-        var y: u6 = 0;
+        var y: usize = 0;
         while (y < 32) : (y += 1) {
+            var x: usize = 0;
             while (x < 64) : (x += 1) {
-                if (x == 63) break;
-                if (chip8.display[y] & (@as(u64, 1) << (63 - x)) == 1) rl.drawRectangle(x * scale, y * scale, scale, scale, .white);
+                const mask = @as(u64, 1) << @intCast(63 - x);
+                if ((chip8.display[y] & mask) != 0) rl.drawRectangle(@intCast(x * scale), @intCast(y * scale), scale, scale, .white);
             }
         }
-    }
-
-    var typeshi: u8 = 0;
-    while (typeshi < 32) : (typeshi += 1) {
-        std.debug.print("{b:0>64}\n", .{chip8.display[typeshi]});
     }
 }

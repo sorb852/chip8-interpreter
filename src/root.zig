@@ -427,21 +427,26 @@ pub const Chip8VM = struct {
         var index: u4 = 0;
         self.V[0xF] = 0;
         while (index < nibble) : (index += 1) {
-            if (self.V[y] + index >= 32) break;
+            const vx = @as(i32, self.V[x]);
+            const vy = (@as(usize, self.V[y]) + index) % 32;
 
-            const shift: u6 = @truncate(64 - 8 - self.V[x]);
-            const sprite_row = if (shift > 0)
-                @as(u64, self.memory[self.I + index]) << shift
+            const sprite_row = if (vx <= 56)
+                @as(u64, self.memory[self.I + index]) << @intCast(56 - vx)
             else
-                @as(u64, self.memory[self.I + index]) << shift;
+                @as(u64, self.memory[self.I + index]) >> @intCast(vx - 56);
             const current_row = self.display[self.V[y] + index];
-            const new_row = current_row ^ sprite_row;
-            if (current_row > current_row & new_row)
+            if ((current_row & sprite_row) != 0)
                 self.V[0xF] = 1;
-            self.display[self.V[y] + index] = new_row;
+
+            self.display[vy] = current_row ^ sprite_row;
         }
         self.needs_redraw = true;
         self.PC += 2;
+
+        // var shi: u5 = 0;
+        // while (shi < 31) : (shi += 1) {
+        //     std.debug.print("{b:0>64}\n", .{self.display[shi]});
+        // }
     }
     /// Skip next instruction if key with value *Vx* is being pressed
     /// Ex9E - SKP Vx
