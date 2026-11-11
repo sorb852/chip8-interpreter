@@ -12,7 +12,7 @@ pub fn main(init: std.process.Init) !void {
     rl.initWindow(screenWidth, screenHeight, "chip8 emulator");
     defer rl.closeWindow(); // js close as it ends lol
 
-    rl.setTargetFPS(120);
+    rl.setTargetFPS(480);
 
     var prng: std.Random.DefaultPrng = .init(0);
 
