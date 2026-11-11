@@ -158,13 +158,15 @@ pub const Chip8VM = struct {
         // HAHAHHAHHAHAH
     }
 
-    /// Tick the interpreter state. Should be run every at 1/60th of a second.
-    /// This will tick the timers
-    pub fn tick(self: *Chip8VM) void {
-        if (self.finished) return;
-
+    /// Ticks the timers. Should be run at 60Hz
+    pub fn tick_timers(self: *Chip8VM) void {
         self.DT -= if (self.DT > 0) 1 else 0;
         self.ST -= if (self.ST > 0) 1 else 0;
+    }
+
+    /// Fetch, decode, execute
+    pub fn step(self: *Chip8VM) void {
+        if (self.finished) return;
 
         // TODO: wtf is this ethical?
         // like should the timer and running instructions be separate?

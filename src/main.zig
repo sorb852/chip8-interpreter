@@ -12,7 +12,7 @@ pub fn main(init: std.process.Init) !void {
     rl.initWindow(screenWidth, screenHeight, "chip8 emulator");
     defer rl.closeWindow(); // js close as it ends lol
 
-    rl.setTargetFPS(60);
+    rl.setTargetFPS(120);
 
     var prng: std.Random.DefaultPrng = .init(0);
 
@@ -27,10 +27,10 @@ pub fn main(init: std.process.Init) !void {
     chip8.init_sprites();
     try chip8.init_rom(&romReader.interface);
 
+    var since_last_tick: f64 = 0;
+
     while (!rl.windowShouldClose() and !chip8.finished) {
-        rl.beginDrawing();
-        defer rl.endDrawing(); // ok nvm this is cool asf
-        rl.clearBackground(.black);
+        since_last_tick += rl.getFrameTime();
 
         // 1234     123C
         // QWER     456D
@@ -57,9 +57,18 @@ pub fn main(init: std.process.Init) !void {
         chip8.poll_input(0xB, rl.isKeyDown(.c));
         chip8.poll_input(0xF, rl.isKeyDown(.v));
 
-        chip8.tick();
+        if (since_last_tick >= 1.0 / 60.0) {
+            chip8.tick_timers();
+            since_last_tick = 0;
+        }
+
+        chip8.step();
+
+        rl.beginDrawing();
+        defer rl.endDrawing(); // ok nvm this is cool asf
 
         if (chip8.needs_redraw) {
+            rl.clearBackground(.black);
             var y: usize = 0;
             while (y < 32) : (y += 1) {
                 var x: usize = 0;
