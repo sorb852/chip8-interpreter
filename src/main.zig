@@ -6,6 +6,7 @@ const ziggy = @import("ziggy");
 const scale = 16;
 const screenWidth = 64 * scale;
 const screenHeight = 32 * scale;
+const DEFAULT_TICK_RATE = 240;
 
 /// Prints the help information onto stderr
 /// TODO: Move to stdout
@@ -13,11 +14,12 @@ fn print_help(executable: []const u8) void {
     std.debug.print("Usage: {s} [OPTIONS] <FILE>\n", .{executable});
     std.debug.print("\n", .{});
     std.debug.print("Arguments:\n", .{});
-    std.debug.print("\t<FILE>: The chip8 file to be executed.\n", .{});
+    std.debug.print("\t<FILE>   The chip8 file to be executed.\n", .{});
     std.debug.print("\n", .{});
     std.debug.print("Options:\n", .{});
-    std.debug.print("\t--help, -h:                          Display help information.\n", .{});
-    std.debug.print("\t--target-tickrate <RATE>, -t <RATE>: Change the tick rate of the emulator.\n", .{});
+    std.debug.print("\t--help, -h                            Display help information.\n", .{});
+    std.debug.print("\t--disable-raylib-logging              Disable raylib logs.\n", .{});
+    std.debug.print("\t--target-tickrate <RATE>, -t <RATE>   Change the tick rate of the emulator. Default {}Hz.\n", .{DEFAULT_TICK_RATE});
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -27,7 +29,8 @@ pub fn main(init: std.process.Init) !void {
     // like i defeinelty wont see you running 10^9 fps. but whataver mane, up to you
     // mane what the fuck why is the argument for rl.setTargetFPS(i32)
     // i get this disgusting fucking number
-    var target_tickrate: i32 = 240;
+    var target_tickrate: i32 = DEFAULT_TICK_RATE;
+    var raylib_logging: bool = true;
 
     var args = init.minimal.args.iterate();
     const executable = std.fs.path.stem(args.next().?);
@@ -35,6 +38,11 @@ pub fn main(init: std.process.Init) !void {
         if (std.ascii.eqlIgnoreCase(arg, "--help") or std.ascii.eqlIgnoreCase(arg, "-h")) {
             print_help(executable);
             std.process.exit(0);
+        }
+
+        if (std.ascii.eqlIgnoreCase(arg, "--disable-raylib-logging")) {
+            raylib_logging = false;
+            continue;
         }
 
         if (std.ascii.eqlIgnoreCase(arg, "--target-tickrate") or std.ascii.eqlIgnoreCase(arg, "-t")) {
@@ -102,6 +110,8 @@ pub fn main(init: std.process.Init) !void {
     };
     rom.close(init.io);
 
+    if (!raylib_logging)
+        rl.setTraceLogLevel(.none);
     rl.initWindow(screenWidth, screenHeight, "chip8 emulator");
     defer rl.closeWindow(); // js close as it ends lol
 
