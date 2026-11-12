@@ -63,8 +63,7 @@ pub const Chip8VM = struct {
 
     /// Loads the ROM code into memory.
     /// Given a reader to the file.
-    pub fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) !void {
-        // ok so had to gemini this one
+    pub fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) error{ReadFailed}!void {
         _ = try reader.readSliceShort(self.memory[512..]);
         self.finished = false;
     }

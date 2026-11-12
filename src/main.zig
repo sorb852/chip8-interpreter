@@ -93,10 +93,13 @@ pub fn main(init: std.process.Init) !void {
         else => {
             std.debug.print("error: failed to open rom, {}.\n", .{err});
             std.process.exit(1);
-        }
+        },
     };
     var rom_reader = rom.reader(init.io, &buf);
-    try chip8.init_rom(&rom_reader.interface);
+    chip8.init_rom(&rom_reader.interface) catch |err| {
+        std.debug.print("error: failed to read rom, {}.\n", .{err});
+        std.process.exit(1);
+    };
     rom.close(init.io);
 
     rl.initWindow(screenWidth, screenHeight, "chip8 emulator");
