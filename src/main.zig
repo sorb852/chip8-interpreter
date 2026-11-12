@@ -18,19 +18,19 @@ pub fn main(init: std.process.Init) !void {
     const executable = try std.fmt.allocPrint(arena, "{s}{s}{s}", .{ std.fs.path.basename(executable_path), if (!std.ascii.eqlIgnoreCase(std.fs.path.extension(executable_path), "")) "." else "", std.fs.path.extension(executable_path) });
     // std.debug.print("Parsing arguments: [{s}", .{args.next() orelse "what???"});
     while (args.next()) |arg| {
-        if (std.ascii.eqlIgnoreCase(arg, "--help")) {
+        if (std.ascii.eqlIgnoreCase(arg, "--help") or std.ascii.eqlIgnoreCase(arg, "-h")) {
             std.debug.print("Usage: {s} [OPTIONS] <FILE>\n", .{executable});
             std.debug.print("\n", .{});
             std.debug.print("Arguments:\n", .{});
             std.debug.print("\t<FILE>: The chip8 file to be executed.\n", .{});
             std.debug.print("\n", .{});
             std.debug.print("Options:\n", .{});
-            std.debug.print("\t--help:            Display help information.\n", .{});
-            std.debug.print("\t--tickrate <RATE>: Change the tick rate of the emulator.\n", .{});
+            std.debug.print("\t--help, -h:                          Display help information.\n", .{});
+            std.debug.print("\t--target-tickrate <RATE>, -t <RATE>: Change the tick rate of the emulator.\n", .{});
             std.process.exit(0);
         }
 
-        if (std.ascii.eqlIgnoreCase(arg, "--tickrate")) {
+        if (std.ascii.eqlIgnoreCase(arg, "--target-tickrate") or std.ascii.eqlIgnoreCase(arg, "-t")) {
             if (args.next()) |value| {
                 std.debug.print("Should check and set tick rate to {s}\n", .{value});
                 continue;
