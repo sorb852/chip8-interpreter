@@ -7,6 +7,8 @@ const scale = 16;
 const screenWidth = 64 * scale;
 const screenHeight = 32 * scale;
 
+/// Prints the help information onto stderr
+/// TODO: Move to stdout
 fn print_help(executable: *[]const u8) void {
     std.debug.print("Usage: {s} [OPTIONS] <FILE>\n", .{executable});
     std.debug.print("\n", .{});
@@ -19,7 +21,7 @@ fn print_help(executable: *[]const u8) void {
 }
 
 pub fn main(init: std.process.Init) !void {
-    const arena: std.mem.Allocator = init.arena.allocator();
+    // const arena: std.mem.Allocator = init.arena.allocator();
 
     var rom_path: ?[:0]const u8 = null;
     // like i defeinelty wont see you running 10^9 fps. but whataver mane, up to you
@@ -40,23 +42,23 @@ pub fn main(init: std.process.Init) !void {
                 target_tickrate = std.fmt.parseInt(@TypeOf(target_tickrate), valuestr, 10) catch |err|
                     switch (err) {
                         error.Overflow => {
-                            std.debug.print("Target tick rate must be a 32 bit integer.\n", .{});
+                            std.debug.print("error: Target tick rate must be a 32 bit integer.\n", .{});
                             std.process.exit(1);
                         },
                         error.InvalidCharacter => {
-                            std.debug.print("Invalid tick rate.\n", .{});
+                            std.debug.print("error: Invalid tick rate.\n", .{});
                             std.process.exit(1);
                         },
                     };
                 continue;
             } else {
-                std.debug.print("No tick rate found for option.\n", .{});
+                std.debug.print("error: No tick rate found for option.\n", .{});
                 std.process.exit(1);
             }
         }
 
         if (rom_path) |_| {
-            std.debug.print("Only one argument for file should be shown\n", .{});
+            std.debug.print("error: Only one argument for file should be shown\n", .{});
             std.process.exit(1);
         } else {
             rom_path = arg;
@@ -64,8 +66,8 @@ pub fn main(init: std.process.Init) !void {
     }
 
     if (rom_path) |_| {} else {
-            std.debug.print("No rom given in arguments.\n", .{});
-            std.process.exit(1);
+        std.debug.print("error: No rom given in arguments.\n", .{});
+        std.process.exit(1);
     }
 
     // Initialize chip8
@@ -76,16 +78,26 @@ pub fn main(init: std.process.Init) !void {
     // Initialize the rom
     var buf: [4096 - 512]u8 = undefined;
     const rom_path_type = std.fs.path.parsePath(rom_path);
-    const rom = if (rom_path_type.kind == .absolute)
-        std.Io.Dir.openFileAbsolute(init.io, rom_path.?, .{})
+    const rom = (if (rom_path_type.kind == .absolute)
+        std.Io.Dir.openFileAbsolute(init.io, rom_path.?, .{ .allow_directory = false })
     else
-        std.Io.Dir.cwd().openFile(init.io, "pong.ch8", .{});
-
-    var romReader = rom.reader(init.io, &buf);
-    try chip8.init_rom(&romReader.interface);
+        std.Io.Dir.cwd().openFile(init.io, rom_path.?, .{ .allow_directory = false })) catch |err| switch (err) {
+        error.FileNotFound => {
+            std.debug.print("error: Rom not found.\n", .{});
+            std.process.exit(1);
+        },
+        error.IsDir => {
+            std.debug.print("error: Given rom path is not a file.\n", .{});
+            std.process.exit(1);
+        },
+        else => {
+            std.debug.print("error: failed to open rom, {}.\n", .{err});
+            std.process.exit(1);
+        }
+    };
+    var rom_reader = rom.reader(init.io, &buf);
+    try chip8.init_rom(&rom_reader.interface);
     rom.close(init.io);
-
-
 
     rl.initWindow(screenWidth, screenHeight, "chip8 emulator");
     defer rl.closeWindow(); // js close as it ends lol
