@@ -9,7 +9,7 @@ const screenHeight = 32 * scale;
 
 /// Prints the help information onto stderr
 /// TODO: Move to stdout
-fn print_help(executable: *[]const u8) void {
+fn print_help(executable: []const u8) void {
     std.debug.print("Usage: {s} [OPTIONS] <FILE>\n", .{executable});
     std.debug.print("\n", .{});
     std.debug.print("Arguments:\n", .{});
@@ -27,13 +27,13 @@ pub fn main(init: std.process.Init) !void {
     // like i defeinelty wont see you running 10^9 fps. but whataver mane, up to you
     // mane what the fuck why is the argument for rl.setTargetFPS(i32)
     // i get this disgusting fucking number
-    var target_tickrate: i32 = 480;
+    var target_tickrate: i32 = 240;
 
     var args = init.minimal.args.iterate();
     const executable = std.fs.path.stem(args.next().?);
     while (args.next()) |arg| {
         if (std.ascii.eqlIgnoreCase(arg, "--help") or std.ascii.eqlIgnoreCase(arg, "-h")) {
-            print_help(&executable);
+            print_help(executable);
             std.process.exit(0);
         }
 
@@ -77,7 +77,7 @@ pub fn main(init: std.process.Init) !void {
 
     // Initialize the rom
     var buf: [4096 - 512]u8 = undefined;
-    const rom_path_type = std.fs.path.parsePath(rom_path);
+    const rom_path_type = std.fs.path.parsePath(rom_path.?);
     const rom = (if (rom_path_type.kind == .absolute)
         std.Io.Dir.openFileAbsolute(init.io, rom_path.?, .{ .allow_directory = false })
     else
