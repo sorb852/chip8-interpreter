@@ -6,6 +6,20 @@ const ziggy = @import("ziggy");
 const DEFAULT_SCALE: u8 = 16;
 const DEFAULT_TICK_RATE: i32 = 240;
 
+const HexConversionError = error{InvalidScheme} | std.fmt.ParseIntError;
+
+/// Converts a hex string to a `raylib.Color`
+fn color_from_hex_string(s: []const u8) HexConversionError!rl.Color {
+    if (s.len != 7 and s[0] != '#') return .InvalidScheme;
+    const parsed = try std.fmt.parseInt(u24, s[1..7], 16);
+    return .{
+        .r = @truncate((parsed & 0xFF0000) >> 4),
+        .g = @truncate((parsed & 0x00FF00) >> 2),
+        .b = @truncate((parsed & 0x0000FF) >> 0),
+        .a = 255,
+    };
+}
+
 /// Prints the help information onto stderr
 /// TODO: Move to stdout
 fn print_help(executable: []const u8) void {
@@ -16,6 +30,8 @@ fn print_help(executable: []const u8) void {
     std.debug.print("\n", .{});
     std.debug.print("Options:\n", .{});
     std.debug.print("\t--help, -h                            Display help information.\n", .{});
+    // std.debug.print("\t--fg <COLOR>                          Change the size of each pixel. Default {}px.\n", .{DEFAULT_SCALE});
+    // std.debug.print("\t--bg <COLOR>                          Change the size of each pixel. Default {}px.\n", .{DEFAULT_SCALE});
     std.debug.print("\t--disable-raylib-logging              Disable raylib logs.\n", .{});
     std.debug.print("\t--scale <SCALE>, -s <SCALE>           Change the size of each pixel. Default {}px.\n", .{DEFAULT_SCALE});
     std.debug.print("\t--target-tickrate <RATE>, -t <RATE>   Change the tick rate of the emulator. Default {}Hz.\n", .{DEFAULT_TICK_RATE});
@@ -49,21 +65,21 @@ pub fn main(init: std.process.Init) !void {
                 scale = std.fmt.parseInt(@TypeOf(scale), valuestr, 10) catch |err|
                     switch (err) {
                         error.Overflow => {
-                            std.debug.print("error: scale must be an unsigned 8 bit integer above 0.\n", .{});
+                            std.debug.print("error: scale must be an unsigned 8 bit integer above 0\n", .{});
                             std.process.exit(1);
                         },
                         error.InvalidCharacter => {
-                            std.debug.print("error: Invalid scale.\n", .{});
+                            std.debug.print("error: invalid scale\n", .{});
                             std.process.exit(1);
                         },
                     };
                 if (scale <= 0) {
-                    std.debug.print("error: scale must be an unsigned 8 bit integer above 0.\n", .{});
+                    std.debug.print("error: scale must be an unsigned 8 bit integer above 0\n", .{});
                     std.process.exit(1);
                 }
                 continue;
             } else {
-                std.debug.print("error: No scale found for option.\n", .{});
+                std.debug.print("error: No scale found for option\n", .{});
                 std.process.exit(1);
             }
         }
@@ -73,23 +89,23 @@ pub fn main(init: std.process.Init) !void {
                 target_tickrate = std.fmt.parseInt(@TypeOf(target_tickrate), valuestr, 10) catch |err|
                     switch (err) {
                         error.Overflow => {
-                            std.debug.print("error: Target tick rate must be a 32 bit integer.\n", .{});
+                            std.debug.print("error: target tick rate must be a 32 bit integer\n", .{});
                             std.process.exit(1);
                         },
                         error.InvalidCharacter => {
-                            std.debug.print("error: Invalid tick rate.\n", .{});
+                            std.debug.print("error: invalid tick rate\n", .{});
                             std.process.exit(1);
                         },
                     };
                 continue;
             } else {
-                std.debug.print("error: No tick rate found for option.\n", .{});
+                std.debug.print("error: no tick rate found for option\n", .{});
                 std.process.exit(1);
             }
         }
 
         if (rom_path) |_| {
-            std.debug.print("error: Only one argument for file should be shown\n", .{});
+            std.debug.print("error: only one argument for file should be shown\n", .{});
             std.process.exit(1);
         } else {
             rom_path = arg;
@@ -97,7 +113,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     if (rom_path) |_| {} else {
-        std.debug.print("error: No rom given in arguments.\n", .{});
+        std.debug.print("error: no rom given in arguments\n", .{});
         std.process.exit(1);
     }
 
@@ -114,24 +130,24 @@ pub fn main(init: std.process.Init) !void {
     else
         std.Io.Dir.cwd().openFile(init.io, rom_path.?, .{ .allow_directory = false })) catch |err| switch (err) {
         error.FileNotFound => {
-            std.debug.print("error: Rom not found.\n", .{});
+            std.debug.print("error: rom not found\n", .{});
             std.process.exit(1);
         },
         error.IsDir => {
-            std.debug.print("error: Given rom path is not a file.\n", .{});
+            std.debug.print("error: given rom path is not a file\n", .{});
             std.process.exit(1);
         },
         else => {
-            std.debug.print("error: failed to open rom, {}.\n", .{err});
+            std.debug.print("error: failed to open rom, {}\n", .{err});
             std.process.exit(1);
         },
     };
+    defer rom.close(init.io);
     var rom_reader = rom.reader(init.io, &buf);
     chip8.init_rom(&rom_reader.interface) catch |err| {
-        std.debug.print("error: failed to read rom, {}.\n", .{err});
+        std.debug.print("error: failed to read rom, {}\n", .{err});
         std.process.exit(1);
     };
-    rom.close(init.io);
 
     const screenWidth = @as(i32, 64) * scale;
     const screenHeight = @as(i32, 32) * scale;
