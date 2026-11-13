@@ -23,8 +23,6 @@ fn print_help(executable: []const u8) void {
 }
 
 pub fn main(init: std.process.Init) !void {
-    // const arena: std.mem.Allocator = init.arena.allocator();
-
     var rom_path: ?[:0]const u8 = null;
     // like i defeinelty wont see you running 10^9 fps. but whataver mane, up to you
     // mane what the fuck why is the argument for rl.setTargetFPS(i32)
@@ -119,7 +117,7 @@ pub fn main(init: std.process.Init) !void {
 
     var since_last_tick: f64 = 0;
 
-    while (!rl.windowShouldClose() and !chip8.finished) {
+    while (!rl.windowShouldClose()) {
         since_last_tick += rl.getFrameTime();
 
         // 1234     123C

@@ -1,13 +1,4 @@
-//! hey its me its verity
-//! ask me anything
-//! i know about a million things
-//! some oui oui type shi
-//! shi
-//! merci
-//! whats the capital of france
-//! what does the cow say
-//! moo moo moo moo
-//! i speak that too
+//! The module for the chip8 interpreter.
 
 const std = @import("std");
 
@@ -57,15 +48,12 @@ pub const Chip8VM = struct {
     /// Stores which register to write to.
     to_set_keypress_to: u4 = 0,
 
-    finished: bool = true,
-
     // Methods
 
     /// Loads the ROM code into memory.
     /// Given a reader to the file.
     pub fn init_rom(self: *Chip8VM, reader: *std.Io.Reader) error{ReadFailed}!void {
         _ = try reader.readSliceShort(self.memory[512..]);
-        self.finished = false;
     }
 
     /// Initialize the hex sprites.
@@ -163,22 +151,11 @@ pub const Chip8VM = struct {
         self.ST -= if (self.ST > 0) 1 else 0;
     }
 
-    /// Fetch, decode, execute
+    /// Fetch, decode, execute cycle. considered a step and runs a single instruction.
     pub fn step(self: *Chip8VM) void {
-        if (self.finished) return;
-
-        // TODO: wtf is this ethical?
-        // like should the timer and running instructions be separate?
-        // yeahh i think so
-        // lets just make it up to the frontend
-        // how about that?
         self.run_instruction();
-
-        // TODO: implement a better way to check for exit
-        // FIX: this just sucks bro holy shit
-        // if (self.PC >= 0x200 and self.memory[self.PC] == 0)
-        //     self.finished = true;
     }
+
     /// Poll input and change state.
     /// Call as many times as you want.
     ///
