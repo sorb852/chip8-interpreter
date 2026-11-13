@@ -3,10 +3,8 @@ const rl = @import("raylib");
 
 const ziggy = @import("ziggy");
 
-const scale = 16;
-const screenWidth = 64 * scale;
-const screenHeight = 32 * scale;
-const DEFAULT_TICK_RATE = 240;
+const DEFAULT_SCALE: u8 = 16;
+const DEFAULT_TICK_RATE: i32 = 240;
 
 /// Prints the help information onto stderr
 /// TODO: Move to stdout
@@ -19,16 +17,19 @@ fn print_help(executable: []const u8) void {
     std.debug.print("Options:\n", .{});
     std.debug.print("\t--help, -h                            Display help information.\n", .{});
     std.debug.print("\t--disable-raylib-logging              Disable raylib logs.\n", .{});
+    std.debug.print("\t--scale <SCALE>, -s <SCALE>           Change the size of each pixel. Default {}px.\n", .{DEFAULT_SCALE});
     std.debug.print("\t--target-tickrate <RATE>, -t <RATE>   Change the tick rate of the emulator. Default {}Hz.\n", .{DEFAULT_TICK_RATE});
 }
 
 pub fn main(init: std.process.Init) !void {
+    // CLI arguments
     var rom_path: ?[:0]const u8 = null;
     // like i defeinelty wont see you running 10^9 fps. but whataver mane, up to you
     // mane what the fuck why is the argument for rl.setTargetFPS(i32)
     // i get this disgusting fucking number
-    var target_tickrate: i32 = DEFAULT_TICK_RATE;
-    var raylib_logging: bool = true;
+    var target_tickrate = DEFAULT_TICK_RATE;
+    var raylib_logging = true;
+    var scale = DEFAULT_SCALE;
 
     var args = init.minimal.args.iterate();
     const executable = std.fs.path.stem(args.next().?);
@@ -41,6 +42,30 @@ pub fn main(init: std.process.Init) !void {
         if (std.ascii.eqlIgnoreCase(arg, "--disable-raylib-logging")) {
             raylib_logging = false;
             continue;
+        }
+
+        if (std.ascii.eqlIgnoreCase(arg, "--scale") or std.ascii.eqlIgnoreCase(arg, "-s")) {
+            if (args.next()) |valuestr| {
+                scale = std.fmt.parseInt(@TypeOf(scale), valuestr, 10) catch |err|
+                    switch (err) {
+                        error.Overflow => {
+                            std.debug.print("error: scale must be an unsigned 8 bit integer above 0.\n", .{});
+                            std.process.exit(1);
+                        },
+                        error.InvalidCharacter => {
+                            std.debug.print("error: Invalid scale.\n", .{});
+                            std.process.exit(1);
+                        },
+                    };
+                if (scale <= 0) {
+                    std.debug.print("error: scale must be an unsigned 8 bit integer above 0.\n", .{});
+                    std.process.exit(1);
+                }
+                continue;
+            } else {
+                std.debug.print("error: No scale found for option.\n", .{});
+                std.process.exit(1);
+            }
         }
 
         if (std.ascii.eqlIgnoreCase(arg, "--target-tickrate") or std.ascii.eqlIgnoreCase(arg, "-t")) {
@@ -107,6 +132,9 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     };
     rom.close(init.io);
+
+    const screenWidth = @as(i32, 64) * scale;
+    const screenHeight = @as(i32, 32) * scale;
 
     if (!raylib_logging)
         rl.setTraceLogLevel(.none);
