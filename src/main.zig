@@ -181,7 +181,7 @@ pub fn main(init: std.process.Init) !void {
 
         // 1234     123C
         // QWER     456D
-        // ASDF ==> 798E
+        // ASDF ==> 789E
         // ZXCV     A0BF
 
         chip8.poll_input(0x1, rl.isKeyDown(.one));
