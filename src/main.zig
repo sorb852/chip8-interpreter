@@ -5,11 +5,13 @@ const ziggy = @import("root.zig");
 
 const DEFAULT_SCALE: u8 = 16;
 const DEFAULT_TICK_RATE: i32 = 240;
+const DEFAULT_FOREGROUND: rl.Color = .white;
+const DEFAULT_BACKGROUND: rl.Color = .black;
 
 const HexConversionError = error{InvalidScheme} || std.fmt.ParseIntError;
 
 /// Converts a hex string to a `raylib.Color`
-fn color_from_hex_string(s: []const u8) HexConversionError!rl.Color {
+fn color_from_hex(s: []const u8) HexConversionError!rl.Color {
     if (s.len != 7 or s[0] != '#') return error.InvalidScheme;
     const parsed = try std.fmt.parseInt(u24, s[1..7], 16);
     return .{
@@ -20,7 +22,7 @@ fn color_from_hex_string(s: []const u8) HexConversionError!rl.Color {
     };
 }
 
-fn color_to_hex_string(c: rl.Color) [7]u8 {
+fn color_to_hex(c: rl.Color) [7]u8 {
     var buf: [7]u8 = undefined;
     if (std.fmt.bufPrint(&buf, "#{x:0>2}{x:0>2}{x:0>2}", .{ c.r, c.g, c.b }) == error.NoSpaceLeft)
         unreachable;
@@ -30,41 +32,41 @@ fn color_to_hex_string(c: rl.Color) [7]u8 {
 test "successful color from hex" {
     const expectEqual = std.testing.expectEqual;
 
-    try expectEqual(rl.Color.init(0xFF, 0x00, 0x00, 0xFF), try color_from_hex_string("#FF0000"));
-    try expectEqual(rl.Color.init(0x00, 0xFF, 0x00, 0xFF), try color_from_hex_string("#00Ff00"));
-    try expectEqual(rl.Color.init(0x00, 0x00, 0xFF, 0xFF), try color_from_hex_string("#0000fF"));
+    try expectEqual(rl.Color.init(0xFF, 0x00, 0x00, 0xFF), try color_from_hex("#FF0000"));
+    try expectEqual(rl.Color.init(0x00, 0xFF, 0x00, 0xFF), try color_from_hex("#00Ff00"));
+    try expectEqual(rl.Color.init(0x00, 0x00, 0xFF, 0xFF), try color_from_hex("#0000fF"));
 
-    try expectEqual(rl.Color.init(0xFF, 0xFF, 0xFF, 0xFF), try color_from_hex_string("#FfFFfF"));
-    try expectEqual(rl.Color.init(0x00, 0x00, 0x00, 0xFF), try color_from_hex_string("#000000"));
+    try expectEqual(rl.Color.init(0xFF, 0xFF, 0xFF, 0xFF), try color_from_hex("#FfFFfF"));
+    try expectEqual(rl.Color.init(0x00, 0x00, 0x00, 0xFF), try color_from_hex("#000000"));
 
-    try expectEqual(rl.Color.init(0xF9, 0xA8, 0x24, 0xFF), try color_from_hex_string("#f9a824"));
-    try expectEqual(rl.Color.init(0xD3, 0x20, 0xD2, 0xFF), try color_from_hex_string("#d320D2"));
+    try expectEqual(rl.Color.init(0xF9, 0xA8, 0x24, 0xFF), try color_from_hex("#f9a824"));
+    try expectEqual(rl.Color.init(0xD3, 0x20, 0xD2, 0xFF), try color_from_hex("#d320D2"));
 }
 
 test "failed colors from hex" {
     const expectError = std.testing.expectError;
 
-    try expectError(error.InvalidScheme, color_from_hex_string("0xff00ff"));
-    try expectError(error.InvalidScheme, color_from_hex_string("#abcdefg"));
-    try expectError(error.InvalidScheme, color_from_hex_string(".hello world!"));
-    try expectError(error.InvalidScheme, color_from_hex_string("zig for the win"));
-    try expectError(error.InvalidScheme, color_from_hex_string("##ff0000"));
-    try expectError(error.InvalidCharacter, color_from_hex_string("#fg0000"));
-    try expectError(error.InvalidCharacter, color_from_hex_string("#0G000f"));
+    try expectError(error.InvalidScheme, color_from_hex("0xff00ff"));
+    try expectError(error.InvalidScheme, color_from_hex("#abcdefg"));
+    try expectError(error.InvalidScheme, color_from_hex(".hello world!"));
+    try expectError(error.InvalidScheme, color_from_hex("zig for the win"));
+    try expectError(error.InvalidScheme, color_from_hex("##ff0000"));
+    try expectError(error.InvalidCharacter, color_from_hex("#fg0000"));
+    try expectError(error.InvalidCharacter, color_from_hex("#0G000f"));
 }
 
 test "color to hex" {
     const expectEqualStrings = std.testing.expectEqualStrings;
 
-    try expectEqualStrings("#ff0000", &color_to_hex_string(.init(0xFF, 0x00, 0x00, 0xFF)));
-    try expectEqualStrings("#00ff00", &color_to_hex_string(.init(0x00, 0xFF, 0x00, 0xFF)));
-    try expectEqualStrings("#0000ff", &color_to_hex_string(.init(0x00, 0x00, 0xFF, 0xFF)));
+    try expectEqualStrings("#ff0000", &color_to_hex(.init(0xFF, 0x00, 0x00, 0xFF)));
+    try expectEqualStrings("#00ff00", &color_to_hex(.init(0x00, 0xFF, 0x00, 0xFF)));
+    try expectEqualStrings("#0000ff", &color_to_hex(.init(0x00, 0x00, 0xFF, 0xFF)));
 
-    try expectEqualStrings("#ffffff", &color_to_hex_string(.init(0xFF, 0xFF, 0xFF, 0xFF)));
-    try expectEqualStrings("#000000", &color_to_hex_string(.init(0x00, 0x00, 0x00, 0xFF)));
+    try expectEqualStrings("#ffffff", &color_to_hex(.init(0xFF, 0xFF, 0xFF, 0xFF)));
+    try expectEqualStrings("#000000", &color_to_hex(.init(0x00, 0x00, 0x00, 0xFF)));
 
-    try expectEqualStrings("#f9a824", &color_to_hex_string(.init(0xF9, 0xA8, 0x24, 0xFF)));
-    try expectEqualStrings("#d320d2", &color_to_hex_string(.init(0xD3, 0x20, 0xD2, 0xFF)));
+    try expectEqualStrings("#f9a824", &color_to_hex(.init(0xF9, 0xA8, 0x24, 0xFF)));
+    try expectEqualStrings("#d320d2", &color_to_hex(.init(0xD3, 0x20, 0xD2, 0xFF)));
 }
 
 /// Prints the help information onto stderr
@@ -77,8 +79,8 @@ fn print_help(executable: []const u8) void {
     std.debug.print("\n", .{});
     std.debug.print("Options:\n", .{});
     std.debug.print("\t--help, -h                            Display help information.\n", .{});
-    // std.debug.print("\t--fg <COLOR>                          Change the size of each pixel. Default {}px.\n", .{DEFAULT_SCALE});
-    // std.debug.print("\t--bg <COLOR>                          Change the size of each pixel. Default {}px.\n", .{DEFAULT_SCALE});
+    std.debug.print("\t--fg <HEX_COLOR>                      Change the foreground of the program. Default {s}.\n", .{color_to_hex(DEFAULT_FOREGROUND)});
+    std.debug.print("\t--bg <HEX_COLOR>                      Change the background of the program. Default {s}.\n", .{color_to_hex(DEFAULT_BACKGROUND)});
     std.debug.print("\t--disable-raylib-logging              Disable raylib logs.\n", .{});
     std.debug.print("\t--scale <SCALE>, -s <SCALE>           Change the size of each pixel. Default {}px.\n", .{DEFAULT_SCALE});
     std.debug.print("\t--target-tickrate <RATE>, -t <RATE>   Change the tick rate of the emulator. Default {}Hz.\n", .{DEFAULT_TICK_RATE});
@@ -93,6 +95,8 @@ pub fn main(init: std.process.Init) !void {
     var target_tickrate = DEFAULT_TICK_RATE;
     var raylib_logging = true;
     var scale = DEFAULT_SCALE;
+    var foreground = DEFAULT_FOREGROUND;
+    var background = DEFAULT_BACKGROUND;
 
     var args = init.minimal.args.iterate();
     const executable = std.fs.path.stem(args.next().?);
@@ -108,7 +112,29 @@ pub fn main(init: std.process.Init) !void {
         }
 
         if (std.ascii.eqlIgnoreCase(arg, "--fg")) {
-            continue;
+            if (args.next()) |hex| {
+                foreground = color_from_hex(hex) catch {
+                    std.debug.print("error: invalid hex string for foreground\n", .{});
+                    std.process.exit(1);
+                };
+                continue;
+            } else {
+                std.debug.print("error: no color found for foreground\n", .{});
+                std.process.exit(1);
+            }
+        }
+
+        if (std.ascii.eqlIgnoreCase(arg, "--bg")) {
+            if (args.next()) |hex| {
+                background = color_from_hex(hex) catch {
+                    std.debug.print("error: invalid hex string for background\n", .{});
+                    std.process.exit(1);
+                };
+                continue;
+            } else {
+                std.debug.print("error: no color found for background\n", .{});
+                std.process.exit(1);
+            }
         }
 
         if (std.ascii.eqlIgnoreCase(arg, "--scale") or std.ascii.eqlIgnoreCase(arg, "-s")) {
@@ -130,7 +156,7 @@ pub fn main(init: std.process.Init) !void {
                 }
                 continue;
             } else {
-                std.debug.print("error: No scale found for option\n", .{});
+                std.debug.print("error: no scale found for option\n", .{});
                 std.process.exit(1);
             }
         }
@@ -251,13 +277,19 @@ pub fn main(init: std.process.Init) !void {
         defer rl.endDrawing(); // ok nvm this is cool asf
 
         if (chip8.needs_redraw) {
-            rl.clearBackground(.black);
+            rl.clearBackground(background);
             var y: usize = 0;
             while (y < 32) : (y += 1) {
                 var x: usize = 0;
                 while (x < 64) : (x += 1) {
                     const mask = @as(u64, 1) << @intCast(63 - x);
-                    if ((chip8.display[y] & mask) != 0) rl.drawRectangle(@intCast(x * scale), @intCast(y * scale), scale, scale, .white);
+                    if ((chip8.display[y] & mask) != 0) rl.drawRectangle(
+                        @intCast(x * scale),
+                        @intCast(y * scale),
+                        scale,
+                        scale,
+                        foreground,
+                    );
                 }
             }
         }
