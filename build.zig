@@ -1,67 +1,55 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
+    // Base configurations
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mod = b.addModule("ziggy", .{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-    });
-
+    // Raylib
     const raylib_dep = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
     });
-
     const raylib = raylib_dep.module("raylib");
-    const raygui = raylib_dep.module("raygui");
+    // const raygui = raylib_dep.module("raygui"); // Currently not needed, maybe never will
     const raylib_artifact = raylib_dep.artifact("raylib");
 
+    // Base executable
+    const create_options = std.Build.Module.CreateOptions{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "raylib", .module = raylib },
+        },
+    };
     const exe = b.addExecutable(.{
-        .name = "ziggy",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "ziggy", .module = mod },
-            },
-        }),
+        .name = "chopped",
+        .root_module = b.createModule(create_options),
     });
-
-    exe.use_llvm = true;
-    exe.use_lld = true;
     exe.root_module.linkLibrary(raylib_artifact);
-    exe.root_module.addImport("raylib", raylib);
-    exe.root_module.addImport("raygui", raygui);
+    exe.use_lld = true;
+    exe.use_llvm = true;
 
+    // exe.root_module.addImport("raygui", raygui);
     b.installArtifact(exe);
 
-    const run_step = b.step("run", "Run the app");
+    // Running
+    const run_exe = b.addRunArtifact(exe);
+    if (b.args) |args|
+        run_exe.addArgs(args);
+    const run_step = b.step("run", "Run the application");
+    run_step.dependOn(&run_exe.step);
 
-    const run_cmd = b.addRunArtifact(exe);
-    run_step.dependOn(&run_cmd.step);
-
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
+    // Unit tests
+    const test_step = b.step("test", "Run unit tests");
+    const unit_tests = b.addTest(.{
+        .root_module = b.createModule(create_options),
     });
+    unit_tests.root_module.linkLibrary(raylib_artifact);
+    unit_tests.use_lld = true;
+    unit_tests.use_llvm = true;
 
-    const run_mod_tests = b.addRunArtifact(mod_tests);
-
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
-    });
-
-    const run_exe_tests = b.addRunArtifact(exe_tests);
-
-    const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
+    const run_unit_tests = b.addRunArtifact(unit_tests);
+    test_step.dependOn(&run_unit_tests.step);
 }
