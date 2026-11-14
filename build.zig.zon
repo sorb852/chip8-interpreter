@@ -2,7 +2,7 @@
     .name = .chopped,
     // this is a [Semantic Version](https://semver.org/).
     // maybe do it like ion gaf
-    .version = "0.0.0",
+    .version = "1.0.0",
     .fingerprint = 0xb56c16c25529e22e, // NOTE: Changing this has security and trust implications.
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
