@@ -1,7 +1,7 @@
 const std = @import("std");
 const rl = @import("raylib");
 
-const ziggy = @import("root.zig");
+const Chip8VM = @import("vm.zig").Chip8VM;
 
 const DEFAULT_SCALE: u8 = 16;
 const DEFAULT_TICK_RATE: i32 = 240;
@@ -196,7 +196,7 @@ pub fn main(init: std.process.Init) !void {
 
     // Initialize chip8
     var prng: std.Random.DefaultPrng = .init(0);
-    var chip8: ziggy.Chip8VM = .{ .rand = prng.random() };
+    var chip8: Chip8VM = .{ .rand = prng.random() };
     chip8.init_sprites();
 
     // Initialize the rom
