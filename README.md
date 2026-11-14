@@ -1,6 +1,6 @@
 # Chopped
 
-A chip-8 interpreter written in Zig. Thought learning zig and gettig into even lower level code at the same time would be fun.
+A chip-8 interpreter written in Zig. Thought learning zig and getting into even lower level code at the same time would be fun.
 
 I guess you could say it was fun. (ignore the commits, or better yet, find my 7 iq pages)
 

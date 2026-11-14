@@ -1,3 +1,5 @@
+// TODO: Sound timer useless, make it not
+
 const std = @import("std");
 const rl = @import("raylib");
 
@@ -127,7 +129,7 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    if (rom_path) |_| {} else {
+    if (rom_path == null) {
         std.debug.print("error: no rom given in arguments\n", .{});
         std.process.exit(1);
     }
@@ -187,7 +189,7 @@ pub fn main(init: std.process.Init) !void {
         chip8.poll_input(0x1, rl.isKeyDown(.one));
         chip8.poll_input(0x2, rl.isKeyDown(.two));
         chip8.poll_input(0x3, rl.isKeyDown(.three));
-        chip8.poll_input(0x4, rl.isKeyDown(.four));
+        chip8.poll_input(0xC, rl.isKeyDown(.four));
 
         chip8.poll_input(0x4, rl.isKeyDown(.q));
         chip8.poll_input(0x5, rl.isKeyDown(.w));
@@ -213,6 +215,8 @@ pub fn main(init: std.process.Init) !void {
 
         rl.beginDrawing();
         defer rl.endDrawing(); // ok nvm this is cool asf
+
+        // TODO: toggle off needs_redraw and dont forget to change the README!
 
         if (chip8.needs_redraw) {
             rl.clearBackground(background);

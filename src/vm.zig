@@ -1,5 +1,7 @@
 //! The module for the chip8 interpreter.
 
+// TODO: Either remove all debug prints or make them flag dependent
+
 const std = @import("std");
 
 /// Chip8 virtual machine. ie, the backend.
@@ -253,6 +255,8 @@ pub const Chip8VM = struct {
                 },
             },
         }
+
+        // TODO: handle unknown instruction at PC, log or halt
     }
 
     // Instruction API
@@ -278,6 +282,7 @@ pub const Chip8VM = struct {
     }
     /// Call a subroutine
     /// 2nnn - CALL addr
+    /// FIX: stack overflow
     fn CALL(self: *Chip8VM, addr: u12) void {
         self.SP += 1;
         self.stack[self.SP] = self.PC;
@@ -405,6 +410,7 @@ pub const Chip8VM = struct {
     }
     /// Display *n* byte sprite starting from location *I* and drawn at *(Vx, Vy)* XOR'd to the screen, *VF* = collision
     /// Dxyn - DRW Vx, Vy, nibble
+    /// FIX: make horizontal wraps and fix overflow
     fn DRW(self: *Chip8VM, x: u4, y: u4, nibble: u4) void {
         // std.debug.print("[INFO] Drawing {} bytes at ({}, {})\n", .{nibble, self.V[x], self.V[y]});
         var index: u4 = 0;
