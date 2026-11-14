@@ -6,18 +6,32 @@ const ziggy = @import("ziggy");
 const DEFAULT_SCALE: u8 = 16;
 const DEFAULT_TICK_RATE: i32 = 240;
 
-const HexConversionError = error{InvalidScheme} | std.fmt.ParseIntError;
+const HexConversionError = error{InvalidScheme} || std.fmt.ParseIntError;
 
 /// Converts a hex string to a `raylib.Color`
 fn color_from_hex_string(s: []const u8) HexConversionError!rl.Color {
-    if (s.len != 7 and s[0] != '#') return .InvalidScheme;
+    if (s.len != 7 or s[0] != '#') return .InvalidScheme;
     const parsed = try std.fmt.parseInt(u24, s[1..7], 16);
     return .{
-        .r = @truncate((parsed & 0xFF0000) >> 4),
-        .g = @truncate((parsed & 0x00FF00) >> 2),
+        .r = @truncate((parsed & 0xFF0000) >> 16),
+        .g = @truncate((parsed & 0x00FF00) >> 8),
         .b = @truncate((parsed & 0x0000FF) >> 0),
         .a = 255,
     };
+}
+
+test "successful hex string conversion" {
+    const expectEqual = std.testing.expectEqual;
+
+    try expectEqual(.init(0xFF, 0x00, 0x00, 0xFF), try color_from_hex_string("#ff0000"));
+    try expectEqual(.init(0x00, 0xFF, 0x00, 0xFF), try color_from_hex_string("#00ff00"));
+    try expectEqual(.init(0x00, 0x00, 0xFF, 0xFF), try color_from_hex_string("#0000ff"));
+
+    try expectEqual(.init(0xFF, 0xFF, 0xFF, 0xFF), try color_from_hex_string("#ffffff"));
+    try expectEqual(.init(0x00, 0x00, 0x00, 0xFF), try color_from_hex_string("#000000"));
+
+    try expectEqual(.init(0xF9, 0xA8, 0x24, 0xFF), try color_from_hex_string("#f9a824"));
+    try expectEqual(.init(0xD3, 0x20, 0xD2, 0xFF), try color_from_hex_string("#d320d2"));
 }
 
 /// Prints the help information onto stderr
