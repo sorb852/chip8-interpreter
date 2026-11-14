@@ -20,7 +20,14 @@ fn color_from_hex_string(s: []const u8) HexConversionError!rl.Color {
     };
 }
 
-test "successful hex string conversion" {
+fn color_to_hex_string(c: rl.Color) [7]u8 {
+    var buf: [7]u8 = undefined;
+    if (std.fmt.bufPrint(&buf, "#{x:0>2}{x:0>2}{x:0>2}", .{ c.r, c.g, c.b }) == error.NoSpaceLeft)
+        unreachable;
+    return buf;
+}
+
+test "successful color from hex" {
     const expectEqual = std.testing.expectEqual;
 
     try expectEqual(rl.Color.init(0xFF, 0x00, 0x00, 0xFF), try color_from_hex_string("#FF0000"));
@@ -34,7 +41,7 @@ test "successful hex string conversion" {
     try expectEqual(rl.Color.init(0xD3, 0x20, 0xD2, 0xFF), try color_from_hex_string("#d320D2"));
 }
 
-test "errors on hex strings" {
+test "failed colors from hex" {
     const expectError = std.testing.expectError;
 
     try expectError(error.InvalidScheme, color_from_hex_string("0xff00ff"));
@@ -44,6 +51,20 @@ test "errors on hex strings" {
     try expectError(error.InvalidScheme, color_from_hex_string("##ff0000"));
     try expectError(error.InvalidCharacter, color_from_hex_string("#fg0000"));
     try expectError(error.InvalidCharacter, color_from_hex_string("#0G000f"));
+}
+
+test "color to hex" {
+    const expectEqualStrings = std.testing.expectEqualStrings;
+
+    try expectEqualStrings("#ff0000", &color_to_hex_string(.init(0xFF, 0x00, 0x00, 0xFF)));
+    try expectEqualStrings("#00ff00", &color_to_hex_string(.init(0x00, 0xFF, 0x00, 0xFF)));
+    try expectEqualStrings("#0000ff", &color_to_hex_string(.init(0x00, 0x00, 0xFF, 0xFF)));
+
+    try expectEqualStrings("#ffffff", &color_to_hex_string(.init(0xFF, 0xFF, 0xFF, 0xFF)));
+    try expectEqualStrings("#000000", &color_to_hex_string(.init(0x00, 0x00, 0x00, 0xFF)));
+
+    try expectEqualStrings("#f9a824", &color_to_hex_string(.init(0xF9, 0xA8, 0x24, 0xFF)));
+    try expectEqualStrings("#d320d2", &color_to_hex_string(.init(0xD3, 0x20, 0xD2, 0xFF)));
 }
 
 /// Prints the help information onto stderr
@@ -83,6 +104,10 @@ pub fn main(init: std.process.Init) !void {
 
         if (std.ascii.eqlIgnoreCase(arg, "--disable-raylib-logging")) {
             raylib_logging = false;
+            continue;
+        }
+
+        if (std.ascii.eqlIgnoreCase(arg, "--fg")) {
             continue;
         }
 
