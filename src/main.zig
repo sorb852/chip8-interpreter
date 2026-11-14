@@ -23,15 +23,27 @@ fn color_from_hex_string(s: []const u8) HexConversionError!rl.Color {
 test "successful hex string conversion" {
     const expectEqual = std.testing.expectEqual;
 
-    try expectEqual(rl.Color.init(0xFF, 0x00, 0x00, 0xFF), try color_from_hex_string("#ff0000"));
-    try expectEqual(rl.Color.init(0x00, 0xFF, 0x00, 0xFF), try color_from_hex_string("#00ff00"));
-    try expectEqual(rl.Color.init(0x00, 0x00, 0xFF, 0xFF), try color_from_hex_string("#0000ff"));
+    try expectEqual(rl.Color.init(0xFF, 0x00, 0x00, 0xFF), try color_from_hex_string("#FF0000"));
+    try expectEqual(rl.Color.init(0x00, 0xFF, 0x00, 0xFF), try color_from_hex_string("#00Ff00"));
+    try expectEqual(rl.Color.init(0x00, 0x00, 0xFF, 0xFF), try color_from_hex_string("#0000fF"));
 
-    try expectEqual(rl.Color.init(0xFF, 0xFF, 0xFF, 0xFF), try color_from_hex_string("#ffffff"));
+    try expectEqual(rl.Color.init(0xFF, 0xFF, 0xFF, 0xFF), try color_from_hex_string("#FfFFfF"));
     try expectEqual(rl.Color.init(0x00, 0x00, 0x00, 0xFF), try color_from_hex_string("#000000"));
 
     try expectEqual(rl.Color.init(0xF9, 0xA8, 0x24, 0xFF), try color_from_hex_string("#f9a824"));
-    try expectEqual(rl.Color.init(0xD3, 0x20, 0xD2, 0xFF), try color_from_hex_string("#d320d2"));
+    try expectEqual(rl.Color.init(0xD3, 0x20, 0xD2, 0xFF), try color_from_hex_string("#d320D2"));
+}
+
+test "errors on hex strings" {
+    const expectError = std.testing.expectError;
+
+    try expectError(error.InvalidScheme, color_from_hex_string("0xff00ff"));
+    try expectError(error.InvalidScheme, color_from_hex_string("#abcdefg"));
+    try expectError(error.InvalidScheme, color_from_hex_string(".hello world!"));
+    try expectError(error.InvalidScheme, color_from_hex_string("zig for the win"));
+    try expectError(error.InvalidScheme, color_from_hex_string("##ff0000"));
+    try expectError(error.InvalidCharacter, color_from_hex_string("#fg0000"));
+    try expectError(error.InvalidCharacter, color_from_hex_string("#0G000f"));
 }
 
 /// Prints the help information onto stderr
