@@ -169,7 +169,7 @@ pub fn main(init: std.process.Init) !void {
 
     if (!raylib_logging)
         rl.setTraceLogLevel(.none);
-    rl.initWindow(screenWidth, screenHeight, "chip8 emulator");
+    rl.initWindow(screenWidth, screenHeight, "Chopped emulator");
     defer rl.closeWindow(); // js close as it ends lol
 
     rl.setTargetFPS(target_tickrate);
